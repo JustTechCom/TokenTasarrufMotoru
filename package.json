@@ -16,7 +16,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist",
-    "prebuild": "npm run clean"
+    "prebuild": "npm run clean",
+    "hooks:install": "tsx scripts/install-hooks.ts",
+    "hooks:install:project": "tsx scripts/install-hooks.ts --project",
+    "hooks:uninstall": "tsx scripts/uninstall-hooks.ts",
+    "hooks:dry-run": "tsx scripts/install-hooks.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
