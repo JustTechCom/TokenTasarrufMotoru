@@ -1,9 +1,10 @@
-import { OptimizationConfig, PipelineInput, PipelineOutput } from "../types.js";
+import { OptimizationConfig, PipelineInput, PipelineOutput, TokenEstimator } from "../types.js";
 import { PromptOptimizer } from "../modules/promptOptimizer.js";
 import { VariantSelector } from "../modules/variantSelector.js";
 import { PolicyEngine } from "./policies.js";
 import { SafetyScorer } from "../modules/safetyScorer.js";
 import { decideFallback } from "./fallback.js";
+import { defaultEstimator } from "../utils/estimator.js";
 import { logger } from "../logger.js";
 
 // ─── Optimization Pipeline ────────────────────────────────────────────────────
@@ -21,11 +22,15 @@ export class OptimizationPipeline {
   private policy: PolicyEngine;
   private scorer: SafetyScorer;
 
-  constructor(private config: OptimizationConfig) {
-    this.optimizer = new PromptOptimizer(config.promptOptimizer);
+  constructor(
+    private config: OptimizationConfig,
+    private estimator: TokenEstimator = defaultEstimator
+  ) {
+    this.optimizer = new PromptOptimizer(config.promptOptimizer, estimator);
     this.selector = new VariantSelector(
       config.variantSelector,
-      config.safety
+      config.safety,
+      estimator
     );
     this.policy = new PolicyEngine(config.policy);
     this.scorer = new SafetyScorer(config.safety);

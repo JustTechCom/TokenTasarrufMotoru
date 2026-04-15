@@ -19,6 +19,7 @@
     "prebuild": "npm run clean"
   },
   "dependencies": {
+    "@anthropic-ai/tokenizer": "^0.0.4",
     "commander": "^12.1.0"
   },
   "devDependencies": {
@@ -30,6 +31,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["claude", "token", "optimizer", "llm", "prompt", "compression"],
+  "keywords": [
+    "claude",
+    "token",
+    "optimizer",
+    "llm",
+    "prompt",
+    "compression"
+  ],
   "license": "MIT"
 }

@@ -65,7 +65,7 @@ export const defaultConfig: OptimizationConfig = {
     hashLength: 8,
   },
   variantSelector: {
-    safetyThreshold: 0.50,
+    safetyThreshold: 0.40,
   },
   policy: {
     shortOutputPolicy: false,
@@ -75,7 +75,7 @@ export const defaultConfig: OptimizationConfig = {
     injectLowVerbosityInstruction: false,
   },
   safety: {
-    threshold: 0.50,
+    threshold: 0.40,
     dryRun: false,
     logViolations: true,
   },

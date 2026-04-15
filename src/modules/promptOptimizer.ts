@@ -1,4 +1,4 @@
-import { PromptOptimizerOptions, PromptVariant } from "../types.js";
+import { PromptOptimizerOptions, PromptVariant, TokenEstimator } from "../types.js";
 import {
   normalizeWhitespace,
   normalizePunctuation,
@@ -15,7 +15,10 @@ import { defaultEstimator } from "../utils/estimator.js";
 // ─── Prompt Optimizer ─────────────────────────────────────────────────────────
 
 export class PromptOptimizer {
-  constructor(private opts: PromptOptimizerOptions) {}
+  constructor(
+    private opts: PromptOptimizerOptions,
+    private estimator: TokenEstimator = defaultEstimator
+  ) {}
 
   /**
    * Full optimization pass. Code blocks and stack traces are protected
@@ -73,7 +76,7 @@ export class PromptOptimizer {
    * Variants: original → normalized → alias-compressed → terse-technical
    */
   variants(input: string): PromptVariant[] {
-    const originalTokens = defaultEstimator.estimate(input);
+    const originalTokens = this.estimator.estimate(input);
 
     // Variant 1: original
     const original: PromptVariant = {
@@ -90,7 +93,7 @@ export class PromptOptimizer {
       if (this.opts.normalizePunctuation) r = normalizePunctuation(r);
       return r;
     });
-    const normalizedTokens = defaultEstimator.estimate(normalizedText);
+    const normalizedTokens = this.estimator.estimate(normalizedText);
     const normalized: PromptVariant = {
       label: "normalized",
       text: normalizedText,
@@ -105,7 +108,7 @@ export class PromptOptimizer {
       if (this.opts.deduplicateSentences) r = deduplicateSentences(r);
       return r;
     });
-    const aliasTokens = defaultEstimator.estimate(aliasText);
+    const aliasTokens = this.estimator.estimate(aliasText);
     const aliasCompressed: PromptVariant = {
       label: "alias-compressed",
       text: aliasText,
@@ -117,7 +120,7 @@ export class PromptOptimizer {
     const terseText = shortenLongPaths(
       collapseRepeatedParagraphs(aliasText)
     );
-    const terseTokens = defaultEstimator.estimate(terseText);
+    const terseTokens = this.estimator.estimate(terseText);
     const terseTechnical: PromptVariant = {
       label: "terse-technical",
       text: terseText,

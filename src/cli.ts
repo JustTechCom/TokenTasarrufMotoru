@@ -9,6 +9,7 @@ import { DiffFilter } from "./modules/diffFilter.js";
 import { ContextRegistry } from "./modules/contextRegistry.js";
 import { logger } from "./logger.js";
 import { LogMode } from "./types.js";
+import { createEstimator, EstimatorType } from "./utils/estimator.js";
 
 // ─── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ program
   .version("1.0.0")
   .option("--config <path>", "Path to config JSON file")
   .option("--dry-run", "Show what would happen without applying changes")
+  .option("--estimator <type>", "Token estimator: heuristic | claude (default: claude)", "claude")
   .option("--debug", "Enable debug logging")
   .option("--quiet", "Suppress info/debug logs");
 
@@ -46,8 +48,10 @@ program
   .option("--dry-run", "Dry run mode")
   .action(async (opts, cmd) => {
     setupLogging(cmd.parent?.opts() ?? {});
+    const globalOpts = cmd.parent?.opts() ?? {};
     const config = await resolveConfig(opts);
-    const pipeline = new OptimizationPipeline(config);
+    const estimator = await createEstimator((globalOpts.estimator ?? "claude") as EstimatorType);
+    const pipeline = new OptimizationPipeline(config, estimator);
     const result = await pipeline.run({ prompt: opts.input, dryRun: opts.dryRun });
 
     logger.out("\n=== TOKEN OPTIMIZER RESULT ===");
@@ -83,9 +87,11 @@ program
   .option("--dry-run", "Dry run mode")
   .action(async (file: string, opts) => {
     setupLogging(program.opts());
+    const globalOpts = program.opts();
     const config = await resolveConfig(opts);
     const input = await readFile(file, "utf8");
-    const pipeline = new OptimizationPipeline(config);
+    const estimator = await createEstimator((globalOpts.estimator ?? "claude") as EstimatorType);
+    const pipeline = new OptimizationPipeline(config, estimator);
     const result = await pipeline.run({ prompt: input, dryRun: opts.dryRun });
 
     logger.out("\n=== OPTIMIZE FILE RESULT ===");
