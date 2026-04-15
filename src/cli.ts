@@ -1,0 +1,272 @@
+#!/usr/bin/env node
+import { Command } from "commander";
+import { readFile } from "fs/promises";
+import { defaultConfig, loadConfigFile, mergeConfig } from "./config.js";
+import { OptimizationPipeline } from "./core/pipeline.js";
+import { JsonMinifier } from "./modules/jsonMinifier.js";
+import { LogFilter } from "./modules/logFilter.js";
+import { DiffFilter } from "./modules/diffFilter.js";
+import { ContextRegistry } from "./modules/contextRegistry.js";
+import { logger } from "./logger.js";
+import { LogMode } from "./types.js";
+
+// ─── CLI ───────────────────────────────────────────────────────────────────────
+
+const program = new Command();
+
+program
+  .name("claude-token-optimizer")
+  .description("Optimize token consumption for Claude Code prompts and outputs")
+  .version("1.0.0")
+  .option("--config <path>", "Path to config JSON file")
+  .option("--dry-run", "Show what would happen without applying changes")
+  .option("--debug", "Enable debug logging")
+  .option("--quiet", "Suppress info/debug logs");
+
+// ─── Helper: load config from CLI options ─────────────────────────────────────
+
+async function resolveConfig(opts: { config?: string; dryRun?: boolean }) {
+  let config = defaultConfig;
+  if (opts.config) {
+    config = await loadConfigFile(opts.config);
+  }
+  if (opts.dryRun) {
+    config = mergeConfig({ safety: { ...config.safety, dryRun: true } });
+  }
+  return config;
+}
+
+// ─── optimize ─────────────────────────────────────────────────────────────────
+
+program
+  .command("optimize")
+  .description("Optimize a prompt string")
+  .requiredOption("--input <text>", "Input prompt text")
+  .option("--config <path>", "Config file")
+  .option("--dry-run", "Dry run mode")
+  .action(async (opts, cmd) => {
+    setupLogging(cmd.parent?.opts() ?? {});
+    const config = await resolveConfig(opts);
+    const pipeline = new OptimizationPipeline(config);
+    const result = await pipeline.run({ prompt: opts.input, dryRun: opts.dryRun });
+
+    logger.out("\n=== TOKEN OPTIMIZER RESULT ===");
+    logger.out(`\nOriginal (${result.selectionResult?.original.estimatedTokens ?? "?"} tokens):`);
+    logger.out(result.original);
+
+    if (result.selectionResult) {
+      logger.out("\nCandidates:");
+      for (const c of result.selectionResult.candidates) {
+        logger.out(
+          `  [${c.label}] ${c.estimatedTokens} tokens (${(c.compressionRatio * 100).toFixed(1)}%)`
+        );
+      }
+    }
+
+    logger.out(`\nChosen: [${result.selectionResult?.chosen.label ?? "original"}]`);
+    logger.out(result.optimized);
+
+    logger.out(`\nEstimated savings: ${result.selectionResult?.estimatedSavings ?? 0} tokens`);
+    logger.out(`Safety score: ${(result.selectionResult?.safetyScore ?? 1).toFixed(3)}`);
+    if (result.fallbackUsed) {
+      logger.out(`⚠ Fallback used: original prompt preserved`);
+    }
+  });
+
+// ─── optimize-file ────────────────────────────────────────────────────────────
+
+program
+  .command("optimize-file")
+  .description("Optimize a prompt from a file")
+  .argument("<file>", "Input file path")
+  .option("--config <path>", "Config file")
+  .option("--dry-run", "Dry run mode")
+  .action(async (file: string, opts) => {
+    setupLogging(program.opts());
+    const config = await resolveConfig(opts);
+    const input = await readFile(file, "utf8");
+    const pipeline = new OptimizationPipeline(config);
+    const result = await pipeline.run({ prompt: input, dryRun: opts.dryRun });
+
+    logger.out("\n=== OPTIMIZE FILE RESULT ===");
+    logger.out(`Original: ${result.selectionResult?.original.estimatedTokens ?? "?"} tokens`);
+    logger.out(`Optimized: ${result.selectionResult?.chosen.estimatedTokens ?? "?"} tokens`);
+    logger.out(`Savings: ${result.selectionResult?.estimatedSavings ?? 0} tokens`);
+    logger.out(`Safety: ${(result.selectionResult?.safetyScore ?? 1).toFixed(3)}`);
+    logger.out(`Fallback: ${result.fallbackUsed}`);
+    logger.out("\n--- Optimized Output ---");
+    logger.out(result.optimized);
+  });
+
+// ─── filter-log ───────────────────────────────────────────────────────────────
+
+program
+  .command("filter-log")
+  .description("Filter log output to relevant lines")
+  .option("--file <path>", "Log file to filter")
+  .option("--mode <mode>", "Log mode: docker, journalctl, dotnet, npm, generic", "generic")
+  .option("--tail <n>", "Keep last N matching lines (0 = all)", "0")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    let input: string;
+    if (opts.file) {
+      input = await readFile(opts.file, "utf8");
+    } else {
+      logger.error("Provide --file <path>");
+      process.exit(1);
+    }
+
+    const config = mergeConfig({
+      logFilter: {
+        ...defaultConfig.logFilter,
+        mode: opts.mode as LogMode,
+        tailLines: parseInt(opts.tail, 10) || 0,
+      },
+    });
+    const filter = new LogFilter(config.logFilter);
+    const result = filter.filter(input);
+
+    logger.out(`\nFiltered ${result.totalOutput} / ${result.totalInput} lines:\n`);
+    logger.out(result.lines.join("\n"));
+  });
+
+// ─── minify-json ──────────────────────────────────────────────────────────────
+
+program
+  .command("minify-json")
+  .description("Minify a JSON file or string")
+  .option("--file <path>", "JSON file to minify")
+  .option("--input <text>", "JSON string to minify")
+  .option("--remove-nulls", "Remove null values", false)
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    let input: string;
+    if (opts.file) {
+      input = await readFile(opts.file, "utf8");
+    } else if (opts.input) {
+      input = opts.input;
+    } else {
+      logger.error("Provide --file or --input");
+      process.exit(1);
+    }
+
+    const config = mergeConfig({
+      jsonMinifier: {
+        ...defaultConfig.jsonMinifier,
+        removeNulls: !!opts.removeNulls,
+      },
+    });
+    const minifier = new JsonMinifier(config.jsonMinifier);
+    const result = minifier.minify(input);
+
+    if (!result.valid) {
+      logger.warn("Input is not valid JSON — returned as-is");
+    }
+    logger.out(`\nTokens: ${result.originalTokens} → ${result.minifiedTokens} (saved ${result.originalTokens - result.minifiedTokens})\n`);
+    logger.out(result.output);
+  });
+
+// ─── filter-diff ──────────────────────────────────────────────────────────────
+
+program
+  .command("filter-diff")
+  .description("Filter a git diff to relevant changes")
+  .option("--file <path>", "Diff file to filter")
+  .option("--hide-whitespace", "Hide whitespace-only changes", true)
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    const input = opts.file
+      ? await readFile(opts.file, "utf8")
+      : (logger.error("Provide --file"), process.exit(1) as never);
+
+    const filter = new DiffFilter(defaultConfig.diffFilter);
+    const result = filter.filter(input);
+
+    logger.out(`\nIncluded files: ${result.filesIncluded.join(", ") || "none"}`);
+    logger.out(`Skipped files: ${result.filesSkipped.join(", ") || "none"}`);
+    logger.out("\n--- Filtered Diff ---");
+    logger.out(result.output);
+  });
+
+// ─── cache ────────────────────────────────────────────────────────────────────
+
+const cache = program.command("cache").description("Context registry operations");
+
+cache
+  .command("put")
+  .description("Store content in the context registry")
+  .option("--file <path>", "File to store")
+  .option("--input <text>", "Text to store")
+  .option("--tags <tags>", "Comma-separated tags")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    let content: string;
+    if (opts.file) {
+      content = await readFile(opts.file, "utf8");
+    } else if (opts.input) {
+      content = opts.input;
+    } else {
+      logger.error("Provide --file or --input");
+      process.exit(1);
+    }
+
+    const tags = opts.tags ? (opts.tags as string).split(",").map((t: string) => t.trim()) : [];
+    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const ref = await registry.putOrRef(content, tags);
+    logger.out(`\nStored as: ${ref}`);
+  });
+
+cache
+  .command("get")
+  .description("Retrieve content from the context registry")
+  .argument("<ref>", "Registry reference (e.g. CTX_ab12cd34)")
+  .action(async (ref: string) => {
+    setupLogging(program.opts());
+    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const content = await registry.get(ref);
+    if (content === null) {
+      logger.error(`Reference not found: ${ref}`);
+      process.exit(1);
+    }
+    logger.out(content);
+  });
+
+cache
+  .command("list")
+  .description("List all registry entries")
+  .action(async () => {
+    setupLogging(program.opts());
+    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const entries = await registry.list();
+    if (entries.length === 0) {
+      logger.out("Registry is empty.");
+      return;
+    }
+    logger.out(`\n${"REF".padEnd(16)} ${"CHARS".padEnd(8)} ${"CREATED".padEnd(24)} PREVIEW`);
+    logger.out("─".repeat(90));
+    for (const e of entries) {
+      const ref = `CTX_${e.hash}`.padEnd(16);
+      const len = String(e.length).padEnd(8);
+      const created = e.createdAt.slice(0, 19).padEnd(24);
+      logger.out(`${ref} ${len} ${created} ${e.summaryPreview.slice(0, 40)}`);
+    }
+  });
+
+// ─── setup logging ────────────────────────────────────────────────────────────
+
+function setupLogging(opts: { debug?: boolean; quiet?: boolean }) {
+  if (opts.debug) logger.setLevel("debug");
+  if (opts.quiet) logger.setQuiet(true);
+}
+
+program.hook("preAction", (_thisCommand, actionCommand) => {
+  const globalOpts = program.opts();
+  setupLogging(globalOpts);
+  // Propagate dry-run to subcommand options if not already set
+  const subOpts = actionCommand.opts() as Record<string, unknown>;
+  if (globalOpts.dryRun && !subOpts["dryRun"]) {
+    subOpts["dryRun"] = true;
+  }
+});
+
+program.parse(process.argv);

@@ -1,0 +1,75 @@
+{
+  "promptOptimizer": {
+    "lowercase": false,
+    "normalizeWhitespace": true,
+    "normalizePunctuation": true,
+    "removeBoilerplate": true,
+    "deduplicateSentences": true,
+    "collapseRepeatedParagraphs": true,
+    "shortenLongPaths": true,
+    "preserveCodeBlocks": true,
+    "preserveStackTraces": true,
+    "preserveUrls": true,
+    "dictionaryMap": {
+      "database": "db",
+      "connection": "conn",
+      "configuration": "config",
+      "authentication": "auth",
+      "repository": "repo",
+      "environment": "env",
+      "application": "app",
+      "implementation": "impl",
+      "function": "fn"
+    },
+    "aggressiveMode": false
+  },
+  "jsonMinifier": {
+    "aliasMap": {
+      "description": "desc",
+      "timestamp": "ts",
+      "createdAt": "cAt",
+      "updatedAt": "uAt"
+    },
+    "removeNulls": false,
+    "removeUndefined": true,
+    "removeEmptyArrays": false,
+    "removeEmptyObjects": false,
+    "aggressiveMode": false
+  },
+  "logFilter": {
+    "mode": "docker",
+    "includeErrors": true,
+    "includeWarnings": true,
+    "includeFailures": true,
+    "tailLines": 50,
+    "customPatterns": [
+      "timeout",
+      "connection refused"
+    ]
+  },
+  "diffFilter": {
+    "hideWhitespaceOnly": true,
+    "summarizeBinaryFiles": true,
+    "fileSummaryThreshold": 150,
+    "relevantHunksOnly": false
+  },
+  "contextRegistry": {
+    "cacheDir": ".claude-token-optimizer/cache",
+    "hashLength": 8
+  },
+  "variantSelector": {
+    "safetyThreshold": 0.70
+  },
+  "policy": {
+    "shortOutputPolicy": true,
+    "terseResponseMode": false,
+    "explanationOnlyIfAsked": true,
+    "maxOutputHint": 500,
+    "injectLowVerbosityInstruction": false
+  },
+  "safety": {
+    "threshold": 0.70,
+    "dryRun": false,
+    "logViolations": true
+  }
+}

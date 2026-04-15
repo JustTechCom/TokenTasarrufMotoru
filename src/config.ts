@@ -1,0 +1,111 @@
+import { OptimizationConfig } from "./types.js";
+
+// ─── Default Configuration ─────────────────────────────────────────────────────
+
+export const defaultConfig: OptimizationConfig = {
+  promptOptimizer: {
+    lowercase: false,
+    normalizeWhitespace: true,
+    normalizePunctuation: false,
+    removeBoilerplate: true,
+    deduplicateSentences: true,
+    collapseRepeatedParagraphs: true,
+    shortenLongPaths: true,
+    preserveCodeBlocks: true,
+    preserveStackTraces: true,
+    preserveUrls: true,
+    dictionaryMap: {
+      "database": "db",
+      "connection": "conn",
+      "configuration": "config",
+      "authentication": "auth",
+      "authorization": "authz",
+      "repository": "repo",
+      "environment": "env",
+      "application": "app",
+      "implementation": "impl",
+      "function": "fn",
+      "parameter": "param",
+      "parameters": "params",
+      "response": "resp",
+      "request": "req",
+      "message": "msg",
+      "information": "info",
+      "documentation": "docs",
+      "performance": "perf",
+      "development": "dev",
+      "production": "prod",
+    },
+    aggressiveMode: false,
+  },
+  jsonMinifier: {
+    aliasMap: {},
+    removeNulls: false,
+    removeUndefined: true,
+    removeEmptyArrays: false,
+    removeEmptyObjects: false,
+    aggressiveMode: false,
+  },
+  logFilter: {
+    mode: "generic",
+    includeErrors: true,
+    includeWarnings: true,
+    includeFailures: true,
+    tailLines: 0,
+    customPatterns: [],
+  },
+  diffFilter: {
+    hideWhitespaceOnly: true,
+    summarizeBinaryFiles: true,
+    fileSummaryThreshold: 150,
+    relevantHunksOnly: false,
+  },
+  contextRegistry: {
+    cacheDir: ".claude-token-optimizer/cache",
+    hashLength: 8,
+  },
+  variantSelector: {
+    safetyThreshold: 0.50,
+  },
+  policy: {
+    shortOutputPolicy: false,
+    terseResponseMode: false,
+    explanationOnlyIfAsked: false,
+    maxOutputHint: null,
+    injectLowVerbosityInstruction: false,
+  },
+  safety: {
+    threshold: 0.50,
+    dryRun: false,
+    logViolations: true,
+  },
+};
+
+/**
+ * Merges a partial user config over the defaults.
+ * Deep-merges top-level sections, so you can override just `policy.terseResponseMode`.
+ */
+export function mergeConfig(
+  partial: Partial<OptimizationConfig>
+): OptimizationConfig {
+  const merged = { ...defaultConfig };
+  for (const section of Object.keys(partial) as Array<keyof OptimizationConfig>) {
+    (merged as Record<string, unknown>)[section] = {
+      ...(defaultConfig[section] as object),
+      ...(partial[section] as object),
+    };
+  }
+  return merged;
+}
+
+/**
+ * Loads config from a JSON file path, merges with defaults.
+ */
+export async function loadConfigFile(
+  path: string
+): Promise<OptimizationConfig> {
+  const { readFile } = await import("fs/promises");
+  const raw = await readFile(path, "utf8");
+  const partial = JSON.parse(raw) as Partial<OptimizationConfig>;
+  return mergeConfig(partial);
+}

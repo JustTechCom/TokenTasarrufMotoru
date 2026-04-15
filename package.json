@@ -1,0 +1,35 @@
+{
+  "name": "claude-token-optimizer",
+  "version": "1.0.0",
+  "description": "Token consumption optimizer for Claude Code — compresses prompts, logs, JSON and diffs while preserving semantic meaning",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "claude-token-optimizer": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["claude", "token", "optimizer", "llm", "prompt", "compression"],
+  "license": "MIT"
+}
