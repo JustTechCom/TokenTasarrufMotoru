@@ -20,7 +20,8 @@
     "hooks:install": "tsx scripts/install-hooks.ts",
     "hooks:install:project": "tsx scripts/install-hooks.ts --project",
     "hooks:uninstall": "tsx scripts/uninstall-hooks.ts",
-    "hooks:dry-run": "tsx scripts/install-hooks.ts --dry-run"
+    "hooks:dry-run": "tsx scripts/install-hooks.ts --dry-run",
+    "mcp": "tsx src/mcp-server.ts"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",

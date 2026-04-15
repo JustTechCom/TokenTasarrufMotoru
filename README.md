@@ -236,7 +236,7 @@ npm run test:coverage     # coverage raporu
 
 - [x] ~~**Gerçek tokenizer entegrasyonu** — `@anthropic-ai/tokenizer` ile `ClaudeTokenEstimator` eklendi; `--estimator claude|heuristic` seçeneği, lazy-load + graceful fallback~~
 - [x] ~~**Claude Code hooks bağlantısı** — `scripts/install-hooks.ts` ile `settings.json`'a `PreToolUse`/`PostToolUse` hook'ları otomatik eklendi; `npm run hooks:install` / `hooks:uninstall` scriptleri~~
-- [ ] **MCP sunucu implementasyonu** — McpAdapter'ı gerçek MCP JSON-RPC server'a dönüştür
+- [x] ~~**MCP sunucu implementasyonu** — `src/mcp-server.ts`: stdio JSON-RPC 2.0, 6 tool (optimize_prompt, minify_json, filter_log, filter_diff, cache_put, cache_get); `npm run mcp` ile başlat~~
 - [ ] **NLP-based safety scorer** — Jaccard yerine embedding benzerliği
 - [ ] **Stream desteği** — büyük log dosyaları için satır satır akış işleme
 - [ ] **Registry TTL** — eski cache girdilerini otomatik temizleme
