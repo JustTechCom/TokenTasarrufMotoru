@@ -57,9 +57,6 @@
     "cacheDir": ".claude-token-optimizer/cache",
     "hashLength": 8
   },
-  "variantSelector": {
-    "safetyThreshold": 0.70
-  },
   "policy": {
     "shortOutputPolicy": true,
     "terseResponseMode": false,

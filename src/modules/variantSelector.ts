@@ -1,4 +1,4 @@
-import { PromptVariant, SelectionResult, VariantSelectorOptions, TokenEstimator } from "../types.js";
+import { PromptVariant, SelectionResult, SafetyOptions, TokenEstimator } from "../types.js";
 import { SafetyScorer } from "./safetyScorer.js";
 import { defaultEstimator } from "../utils/estimator.js";
 import { logger } from "../logger.js";
@@ -10,8 +10,7 @@ export class VariantSelector {
   private estimator: TokenEstimator;
 
   constructor(
-    private opts: VariantSelectorOptions,
-    safetyOpts: { threshold: number; dryRun: boolean; logViolations: boolean },
+    safetyOpts: SafetyOptions,
     estimator: TokenEstimator = defaultEstimator
   ) {
     this.scorer = new SafetyScorer(safetyOpts);

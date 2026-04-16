@@ -27,11 +27,7 @@ export class OptimizationPipeline {
     private estimator: TokenEstimator = defaultEstimator
   ) {
     this.optimizer = new PromptOptimizer(config.promptOptimizer, estimator);
-    this.selector = new VariantSelector(
-      config.variantSelector,
-      config.safety,
-      estimator
-    );
+    this.selector = new VariantSelector(config.safety, estimator);
     this.policy = new PolicyEngine(config.policy);
     this.scorer = new SafetyScorer(config.safety);
   }

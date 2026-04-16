@@ -64,9 +64,6 @@ export const defaultConfig: OptimizationConfig = {
     cacheDir: ".claude-token-optimizer/cache",
     hashLength: 8,
   },
-  variantSelector: {
-    safetyThreshold: 0.40,
-  },
   policy: {
     shortOutputPolicy: false,
     terseResponseMode: false,

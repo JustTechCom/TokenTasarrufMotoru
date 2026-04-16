@@ -9,7 +9,6 @@ export interface OptimizationConfig {
   logFilter: LogFilterOptions;
   diffFilter: DiffFilterOptions;
   contextRegistry: ContextRegistryOptions;
-  variantSelector: VariantSelectorOptions;
   policy: PolicyOptions;
   safety: SafetyOptions;
 }
@@ -99,12 +98,6 @@ export interface RegistryEntry {
 export interface RegistryIndex {
   version: number;
   entries: Record<string, RegistryEntry>; // key = hash
-}
-
-// ─── Variant Selector ─────────────────────────────────────────────────────────
-
-export interface VariantSelectorOptions {
-  safetyThreshold: number; // 0.0 – 1.0
 }
 
 export interface SelectionResult {

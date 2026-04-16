@@ -171,6 +171,8 @@ claude-token-optimizer optimize --config my-config.json --input "..."
 | `policy.shortOutputPolicy` | `false` | Kısa yanıt talimatı inject et |
 | `policy.maxOutputHint` | `null` | Hedef yanıt token sayısı |
 
+Not: Güvenlik eşiği için tek kaynak `safety.threshold` alanıdır; varyant seçiminde de fallback kararında da aynı değer kullanılır.
+
 `logFilter` bayraklarının etkisi:
 
 - `includeErrors: true, includeWarnings: false, includeFailures: false` → sadece error/fatal/exception satırları döner.
