@@ -164,9 +164,19 @@ claude-token-optimizer optimize --config my-config.json --input "..."
 | `promptOptimizer.deduplicateSentences` | `true` | Tekrar eden cümleleri sil |
 | `safety.threshold` | `0.50` | Bu değerin altındaki sıkıştırma oranlarında fallback |
 | `logFilter.mode` | `"generic"` | Log filtresi modu |
+| `logFilter.includeErrors` | `true` | `error/fatal/exception` gibi satırları dahil et |
+| `logFilter.includeWarnings` | `true` | `warn/warning/notice` gibi satırları dahil et |
+| `logFilter.includeFailures` | `true` | `failed/crash/unhealthy/exit code` gibi satırları dahil et |
 | `logFilter.tailLines` | `0` | Son N satırı tut (0 = hepsi) |
 | `policy.shortOutputPolicy` | `false` | Kısa yanıt talimatı inject et |
 | `policy.maxOutputHint` | `null` | Hedef yanıt token sayısı |
+
+`logFilter` bayraklarının etkisi:
+
+- `includeErrors: true, includeWarnings: false, includeFailures: false` → sadece error/fatal/exception satırları döner.
+- `includeErrors: false, includeWarnings: true, includeFailures: false` → sadece warning/notice satırları döner.
+- `includeErrors: false, includeWarnings: false, includeFailures: true` → sadece failed/crash/exit code satırları döner.
+- Üçü de `false` ise **strict mod** uygulanır ve boş sonuç (`[]`) döner (passthrough yapılmaz).
 
 ## Library API
 
