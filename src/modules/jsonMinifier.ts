@@ -1,10 +1,5 @@
 import { JsonMinifierOptions } from "../types.js";
-import {
-  safeParse,
-  deepClean,
-  applyKeyAliases,
-  type JsonValue,
-} from "../utils/json.js";
+import { safeParse, deepClean, applyKeyAliases } from "../utils/json.js";
 import { defaultEstimator } from "../utils/estimator.js";
 
 // ─── JSON Minifier ────────────────────────────────────────────────────────────
@@ -33,7 +28,7 @@ export class JsonMinifier {
       };
     }
 
-    let value: JsonValue = parsed;
+    let value: unknown = parsed;
 
     // Apply key aliases if provided
     if (Object.keys(this.opts.aliasMap).length > 0) {

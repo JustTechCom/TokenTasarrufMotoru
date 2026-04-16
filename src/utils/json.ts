@@ -1,16 +1,11 @@
 // ─── JSON Utilities ────────────────────────────────────────────────────────────
 
-export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonArray = JsonValue[];
-
 /**
  * Safely parses JSON without throwing.
  */
-export function safeParse(raw: string): JsonValue | null {
+export function safeParse(raw: string): unknown | null {
   try {
-    return JSON.parse(raw) as JsonValue;
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -26,11 +21,9 @@ interface CleanOptions {
   removeEmptyObjects?: boolean;
 }
 
-export function deepClean(
-  value: JsonValue,
-  opts: CleanOptions
-): JsonValue | undefined {
+export function deepClean(value: unknown, opts: CleanOptions): unknown {
   if (value === null && opts.removeNulls) return undefined;
+  if (value === undefined && opts.removeUndefined) return undefined;
 
   if (Array.isArray(value)) {
     const cleaned = value
@@ -41,8 +34,8 @@ export function deepClean(
   }
 
   if (typeof value === "object" && value !== null) {
-    const obj = value as JsonObject;
-    const result: JsonObject = {};
+    const obj = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
       const cleaned = deepClean(v, opts);
       if (cleaned !== undefined) {
@@ -63,16 +56,16 @@ export function deepClean(
  * E.g. { "description": "desc", "timestamp": "ts" }
  */
 export function applyKeyAliases(
-  value: JsonValue,
+  value: unknown,
   aliasMap: Record<string, string>
-): JsonValue {
+): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => applyKeyAliases(item, aliasMap));
   }
 
   if (typeof value === "object" && value !== null) {
-    const obj = value as JsonObject;
-    const result: JsonObject = {};
+    const obj = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
       const newKey = aliasMap[k] ?? k;
       result[newKey] = applyKeyAliases(v, aliasMap);
