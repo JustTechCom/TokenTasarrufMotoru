@@ -28,7 +28,7 @@ export class JsonMinifier {
       };
     }
 
-    let value = parsed;
+    let value: unknown = parsed;
 
     // Apply key aliases if provided
     if (Object.keys(this.opts.aliasMap).length > 0) {
