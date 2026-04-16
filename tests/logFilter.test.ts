@@ -69,17 +69,63 @@ npm error missing package
     expect(result.lines.some((l) => l.toLowerCase().includes("error"))).toBe(true);
   });
 
-  it("returns all lines when no patterns match", () => {
+  it("returns empty result in strict mode when all include flags are disabled", () => {
     const filter = new LogFilter({
       ...defaultConfig.logFilter,
       mode: "generic",
+      includeErrors: false,
+      includeWarnings: false,
+      includeFailures: false,
       customPatterns: [],
     });
-    // Generic mode has its own patterns, so test with a totally different mode
     const cleanLog = "INFO: all good\nINFO: still good\nINFO: perfect";
     const result = filter.filter(cleanLog);
-    // Generic mode will filter out INFO-only lines
     expect(result.totalInput).toBe(3);
-    expect(result.totalOutput).toBeLessThanOrEqual(result.totalInput);
+    expect(result.totalOutput).toBe(0);
+    expect(result.lines).toEqual([]);
+  });
+
+  it("includes only warning patterns when only includeWarnings is enabled", () => {
+    const filter = new LogFilter({
+      ...defaultConfig.logFilter,
+      mode: "docker",
+      includeErrors: false,
+      includeWarnings: true,
+      includeFailures: false,
+    });
+    const result = filter.filter(SAMPLE_DOCKER_LOG);
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0]).toContain("WARN");
+  });
+
+  it("includes only failure patterns when only includeFailures is enabled", () => {
+    const filter = new LogFilter({
+      ...defaultConfig.logFilter,
+      mode: "docker",
+      includeErrors: false,
+      includeWarnings: false,
+      includeFailures: true,
+    });
+    const result = filter.filter(SAMPLE_DOCKER_LOG);
+    expect(result.lines.some((line) => line.includes("Failed"))).toBe(true);
+    expect(result.lines.some((line) => line.includes("WARN"))).toBe(false);
+  });
+
+  it("includes only error patterns when only includeErrors is enabled", () => {
+    const filter = new LogFilter({
+      ...defaultConfig.logFilter,
+      mode: "docker",
+      includeErrors: true,
+      includeWarnings: false,
+      includeFailures: false,
+    });
+    const result = filter.filter(SAMPLE_DOCKER_LOG);
+    expect(result.lines.some((line) => line.includes("ERROR"))).toBe(true);
+    expect(result.lines.some((line) => line.includes("WARN"))).toBe(false);
+    expect(
+      result.lines.every(
+        (line) => line.includes("ERROR") || line.includes("FATAL")
+      )
+    ).toBe(true);
   });
 });
