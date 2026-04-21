@@ -1,5 +1,5 @@
 import { SafetyOptions, SafetyResult } from "../types.js";
-import { charNgramSimilarity, wordSimilarity } from "../utils/text.js";
+import { charNgramSimilarity, wordSimilarity, tfidfCosineSimilarity } from "../utils/text.js";
 import { logger } from "../logger.js";
 
 // ─── Safety Scorer ────────────────────────────────────────────────────────────
@@ -16,7 +16,11 @@ export class SafetyScorer {
   score(original: string, optimized: string): SafetyResult {
     const lexicalSimilarity = wordSimilarity(original, optimized);
     const ngramSimilarity = charNgramSimilarity(original, optimized);
-    const similarity = Math.max(lexicalSimilarity, ngramSimilarity);
+
+    const tokenCount = original.split(/\W+/).filter(Boolean).length;
+    const similarity = tokenCount < 6
+      ? Math.max(lexicalSimilarity, ngramSimilarity)
+      : Math.max(tfidfCosineSimilarity(original, optimized), lexicalSimilarity);
 
     // Length ratio guard: if optimized is less than 40% the original length
     // in chars, it's likely too aggressive regardless of word overlap.
