@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LogFilter } from "../src/modules/logFilter.js";
 import { defaultConfig } from "../src/config.js";
+import { Readable } from "node:stream";
 
 const SAMPLE_DOCKER_LOG = `
 2024-01-15T10:00:01 container/web INFO Server started on port 3000
@@ -127,5 +128,75 @@ npm error missing package
         (line) => line.includes("ERROR") || line.includes("FATAL")
       )
     ).toBe(true);
+  });
+});
+
+describe("LogFilter.filterStream", () => {
+  const LINES = [
+    "2024-01-15 INFO Server started",
+    "2024-01-15 ERROR connection timeout",
+    "2024-01-15 INFO GET /health 200",
+    "2024-01-15 WARN Retrying connection",
+    "2024-01-15 ERROR Failed to connect",
+  ];
+
+  async function collect(gen: AsyncGenerator<string>): Promise<string[]> {
+    const out: string[] = [];
+    for await (const line of gen) out.push(line);
+    return out;
+  }
+
+  it("yields matching lines in order (tailLines=0)", async () => {
+    const filter = new LogFilter({ ...defaultConfig.logFilter, mode: "docker", tailLines: 0 });
+    const stream = Readable.from(LINES.join("\n"));
+    const result = await collect(filter.filterStream(stream));
+    expect(result).toContain("2024-01-15 ERROR connection timeout");
+    expect(result).toContain("2024-01-15 WARN Retrying connection");
+    expect(result).toContain("2024-01-15 ERROR Failed to connect");
+    expect(result.some((l) => l.includes("INFO Server started"))).toBe(false);
+  });
+
+  it("returns only last N matching lines (tailLines=2)", async () => {
+    const filter = new LogFilter({ ...defaultConfig.logFilter, mode: "docker", tailLines: 2 });
+    const stream = Readable.from(LINES.join("\n"));
+    const result = await collect(filter.filterStream(stream));
+    expect(result.length).toBeLessThanOrEqual(2);
+    expect(result[result.length - 1]).toContain("Failed to connect");
+  });
+
+  it("yields nothing in strict mode (all flags false)", async () => {
+    const filter = new LogFilter({
+      ...defaultConfig.logFilter,
+      mode: "generic",
+      includeErrors: false,
+      includeWarnings: false,
+      includeFailures: false,
+      customPatterns: [],
+    });
+    const stream = Readable.from(LINES.join("\n"));
+    const result = await collect(filter.filterStream(stream));
+    expect(result).toHaveLength(0);
+  });
+
+  it("handles empty stream (yields nothing)", async () => {
+    const filter = new LogFilter({ ...defaultConfig.logFilter, mode: "docker" });
+    const stream = Readable.from("");
+    const result = await collect(filter.filterStream(stream));
+    expect(result).toHaveLength(0);
+  });
+
+  it("applies custom patterns in stream mode", async () => {
+    const filter = new LogFilter({
+      ...defaultConfig.logFilter,
+      mode: "generic",
+      includeErrors: false,
+      includeWarnings: false,
+      includeFailures: false,
+      customPatterns: ["Server started"],
+    });
+    const stream = Readable.from(LINES.join("\n"));
+    const result = await collect(filter.filterStream(stream));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain("Server started");
   });
 });

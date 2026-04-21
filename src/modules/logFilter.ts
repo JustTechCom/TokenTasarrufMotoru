@@ -1,3 +1,4 @@
+import { createInterface } from "readline";
 import { LogFilterOptions, LogFilterResult, LogMode } from "../types.js";
 
 // ─── Log Filter ───────────────────────────────────────────────────────────────
@@ -66,18 +67,20 @@ export class LogFilter {
     return [...selected, ...custom];
   }
 
+  private matchesLine(line: string): boolean {
+    return this.patterns.some((re) => re.test(line));
+  }
+
   filter(input: string): LogFilterResult {
     const allLines = input.split("\n");
     const totalInput = allLines.length;
 
     let filtered: string[];
 
-    // Strict mode: if no category/custom pattern is selected, return empty result.
     filtered = this.patterns.length === 0
       ? []
-      : allLines.filter((line) => this.patterns.some((re) => re.test(line)));
+      : allLines.filter((line) => this.matchesLine(line));
 
-    // Apply tail limit
     if (this.opts.tailLines > 0 && filtered.length > this.opts.tailLines) {
       filtered = filtered.slice(-this.opts.tailLines);
     }
@@ -91,5 +94,29 @@ export class LogFilter {
 
   filterText(input: string): string {
     return this.filter(input).lines.join("\n");
+  }
+
+  async *filterStream(readable: NodeJS.ReadableStream): AsyncGenerator<string> {
+    const rl = createInterface({ input: readable, crlfDelay: Infinity });
+
+    if (this.patterns.length === 0) {
+      rl.close();
+      return;
+    }
+
+    if (this.opts.tailLines === 0) {
+      for await (const line of rl) {
+        if (this.matchesLine(line)) yield line;
+      }
+    } else {
+      const buf: string[] = [];
+      for await (const line of rl) {
+        if (this.matchesLine(line)) {
+          if (buf.length >= this.opts.tailLines) buf.shift();
+          buf.push(line);
+        }
+      }
+      for (const line of buf) yield line;
+    }
   }
 }
