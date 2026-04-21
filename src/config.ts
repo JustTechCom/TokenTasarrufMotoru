@@ -113,6 +113,12 @@ export const defaultConfig: OptimizationConfig = {
     dryRun: false,
     logViolations: true,
   },
+  ollamaOptimizer: {
+    enabled: false,
+    baseUrl: "http://localhost:11434",
+    model: "gemma4",
+    timeoutMs: 10000,
+  },
 };
 
 /**

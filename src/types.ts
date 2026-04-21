@@ -11,6 +11,7 @@ export interface OptimizationConfig {
   contextRegistry: ContextRegistryOptions;
   policy: PolicyOptions;
   safety: SafetyOptions;
+  ollamaOptimizer: OllamaOptimizerOptions;
 }
 
 // ─── Prompt Optimizer ─────────────────────────────────────────────────────────
@@ -163,6 +164,15 @@ export interface SafetyResult {
   score: number;
   passed: boolean;
   reason?: string;
+}
+
+// ─── Ollama Optimizer ─────────────────────────────────────────────────────────
+
+export interface OllamaOptimizerOptions {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  timeoutMs: number;
 }
 
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
