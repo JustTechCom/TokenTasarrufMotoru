@@ -470,3 +470,13 @@ Core modules:
 - `diffFilter`: diff cleanup
 - `contextRegistry`: disk-backed `CTX_` registry
 - `englishSemanticProvider`: learned semantic phrase replacements
+
+## Roadmap
+
+- [x] ~~**NLP-based safety scorer** — hybrid TF-IDF cosine + Jaccard fallback for short texts~~
+- [ ] **Stream support** — line-by-line streaming for large log files
+- [ ] **Registry TTL** — automatic purge of stale cache entries
+- [ ] **Diff awareness** — track context across multiple change rounds
+- [ ] **Session growth tracking** — increase compression aggressiveness as conversation grows
+- [ ] **OpenTelemetry tracing** — spans for each pipeline step
+- [ ] **Web UI** — local dashboard for optimise/registry viewing
