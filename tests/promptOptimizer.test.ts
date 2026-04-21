@@ -109,6 +109,89 @@ describe("PromptOptimizer", () => {
     expect(alias!.text).not.toMatch(/^Bir kullanıcı olarak/i);
     expect(alias!.text).not.toContain("böylece");
   });
+  it("compresses sandbox approval prompts without semantic drift", async () => {
+    const variants = await optimizer.variantsAsync(
+      "Do you want to run a one-off Codex CLI check outside the sandbox to verify it can return JSON for the bridge?"
+    );
+    const alias = variants.find((v) => v.label === "alias-compressed");
+
+    expect(alias).toBeDefined();
+    expect(alias!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(alias!.text).not.toMatch(/^Do you want to/i);
+    expect(alias!.text).toContain("run one-off Codex CLI check");
+    expect(alias!.text).toContain("outside sandbox");
+    expect(alias!.text).toContain("verify JSON for bridge");
+    expect(alias!.text).not.toContain("away");
+  });
+
+  it("canonicalizes approval responses into persistent prefix policy", () => {
+    const variants = optimizer.variants(
+      "Yes, and don't ask again for commands that start with npm run build"
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(normalized!.text).toContain("Yes");
+    expect(normalized!.text).toContain("don't ask again");
+    expect(normalized!.text).toContain("cmds starting with npm run build");
+  });
+
+  it("canonicalizes technical progress updates into terse debug notes", () => {
+    const variants = optimizer.variants(
+      "An empty-bodied 500 was verified. Now I'm running the same request in the process with app.inject and adding a temporary errorHandler to draw up the actual exception."
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(normalized!.text).toContain("500 verified");
+    expect(normalized!.text).toContain("Running same req in-proc via app.inject");
+    expect(normalized!.text).toContain("adding temp errorHandler");
+    expect(normalized!.text).toContain("draw up actual exception");
+  });
+
+  it("canonicalizes status summaries about remaining work and verification", () => {
+    const variants = optimizer.variants(
+      "The heuristic has been completely reverted. The only remaining change now is prompt tightening; I'm confirming this with testing and building."
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(normalized!.text).toContain("heuristic completely reverted");
+    expect(normalized!.text).toContain("remaining change: prompt tightening");
+    expect(normalized!.text).toContain("confirming via tests/build");
+    expect(normalized!.text).not.toContain("odd change");
+    expect(normalized!.text).not.toContain("all reverted");
+  });
+
+  it("canonicalizes implementation guidance with bullets and shell line continuations", () => {
+    const variants = optimizer.variants(`This behavior is a result of the normal popup lifecycle: when the browser extension popup closes, the DOM and JS context are completely destroyed. If the state is only stored in the useState/variable, it starts from scratch when the popup is reopened. ^
+
+This repository currently does not contain the actual extension source code; only the bridge/ and plan documentation. Therefore, I cannot directly patch the popup code here. The solution is clear: ^
+
+- Store the temporary screen state in browser.storage.session or browser.storage.local, not in popup memory. ^
+- Load the saved draft state as soon as the popup opens. ^
+- Write to storage with debounce as the form field changes. ^
+- Delete the draft from storage when the operation is successfully completed or if the user clicks "clear".`);
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(normalized!.text).toContain("Normal popup lifecycle:");
+    expect(normalized!.text).toContain("closing browser extension popup destroys DOM and JS context");
+    expect(normalized!.text).toContain("If state is only in the useState/var, it resets on popup reopen");
+    expect(normalized!.text).toContain("This repo lacks the extension source code; only the bridge/ and plan docs.");
+    expect(normalized!.text).toContain("So I can't patch the popup code here. Fix:");
+    expect(normalized!.text).toContain("browser.storage.session/local");
+    expect(normalized!.text).toContain("Load saved draft when popup opens.");
+    expect(normalized!.text).toContain("Fix:\n- Store temp screen state");
+    expect(normalized!.text).toContain("Debounce writes to storage on form field change.");
+    expect(normalized!.text).toContain("Delete draft on success or clear.");
+    expect(normalized!.text).not.toContain("^");
+  });
+
   it("applies built-in English semantic shortening", () => {
     const input = "Additional documentation regarding the application configuration is required.";
     const result = optimizer.optimize(input);

@@ -7,13 +7,16 @@ import {
   shortenLongPaths,
   removeBoilerplate,
   compressUserStory,
+  compressApprovalPrompt,
   canonicalizeTechnicalMessage,
+  compressQualifiedAlternatives,
   applyDictionaryMap,
   processOutsideCodeBlocks,
   looksLikeStackTrace,
 } from "../utils/text.js";
 import { defaultEstimator } from "../utils/estimator.js";
 import { EnglishSemanticProvider } from "./englishSemanticProvider.js";
+import { canonicalizeIntentAwareText, detectIntentKind } from "./intentCanonicalizer.js";
 
 // ─── Prompt Optimizer ─────────────────────────────────────────────────────────
 
@@ -27,6 +30,10 @@ export class PromptOptimizer {
     this.semanticProvider = new EnglishSemanticProvider(opts.semanticCompression);
   }
 
+  private shouldApplySemanticCompression(intentKind: string): boolean {
+    return intentKind === "generic";
+  }
+
   /**
    * Full optimization pass. Code blocks and stack traces are protected
    * from modification when their respective preserve flags are set.
@@ -35,6 +42,8 @@ export class PromptOptimizer {
     let text = input;
 
     const process = (chunk: string): string => {
+      const intentKind = detectIntentKind(chunk);
+
       // Skip stack traces if preserveStackTraces is enabled
       if (this.opts.preserveStackTraces && looksLikeStackTrace(chunk)) {
         return chunk;
@@ -50,9 +59,12 @@ export class PromptOptimizer {
         chunk = normalizePunctuation(chunk);
       }
       chunk = canonicalizeTechnicalMessage(chunk);
+      chunk = canonicalizeIntentAwareText(chunk);
+      chunk = compressQualifiedAlternatives(chunk);
       if (this.opts.removeBoilerplate) {
         chunk = removeBoilerplate(chunk);
         chunk = compressUserStory(chunk);
+        chunk = compressApprovalPrompt(chunk);
       }
       if (this.opts.deduplicateSentences) {
         chunk = deduplicateSentences(chunk);
@@ -63,7 +75,9 @@ export class PromptOptimizer {
       if (Object.keys(this.opts.dictionaryMap).length > 0) {
         chunk = applyDictionaryMap(chunk, this.opts.dictionaryMap);
       }
-      chunk = this.semanticProvider.compress(chunk);
+      if (this.shouldApplySemanticCompression(intentKind)) {
+        chunk = this.semanticProvider.compress(chunk);
+      }
       return chunk;
     };
 
@@ -82,7 +96,10 @@ export class PromptOptimizer {
   }
 
   async optimizeAsync(input: string): Promise<string> {
-    return this.semanticProvider.compressAsync(this.optimize(input));
+    const optimized = this.optimize(input);
+    return detectIntentKind(input) === "generic"
+      ? this.semanticProvider.compressAsync(optimized)
+      : optimized;
   }
 
   /**
@@ -91,6 +108,7 @@ export class PromptOptimizer {
    */
   variants(input: string): PromptVariant[] {
     const originalTokens = this.estimator.estimate(input);
+    const inputIntent = detectIntentKind(input);
 
     // Variant 1: original
     const original: PromptVariant = {
@@ -106,7 +124,15 @@ export class PromptOptimizer {
       if (this.opts.normalizeWhitespace) r = normalizeWhitespace(r);
       if (this.opts.normalizePunctuation) r = normalizePunctuation(r);
       r = canonicalizeTechnicalMessage(r);
-      r = this.semanticProvider.compress(r);
+      r = canonicalizeIntentAwareText(r);
+      r = compressQualifiedAlternatives(r);
+      r = compressApprovalPrompt(r);
+      if (Object.keys(this.opts.dictionaryMap).length > 0) {
+        r = applyDictionaryMap(r, this.opts.dictionaryMap);
+      }
+      if (this.shouldApplySemanticCompression(inputIntent)) {
+        r = this.semanticProvider.compress(r);
+      }
       return r;
     });
     const normalizedTokens = this.estimator.estimate(normalizedText);
@@ -121,8 +147,12 @@ export class PromptOptimizer {
     const aliasText = processOutsideCodeBlocks(normalizedText, (t) => {
       let r = removeBoilerplate(t);
       r = compressUserStory(r);
+      r = compressApprovalPrompt(r);
+      r = compressQualifiedAlternatives(r);
       r = applyDictionaryMap(r, this.opts.dictionaryMap);
-      r = this.semanticProvider.compress(r);
+      if (this.shouldApplySemanticCompression(inputIntent)) {
+        r = this.semanticProvider.compress(r);
+      }
       if (this.opts.deduplicateSentences) r = deduplicateSentences(r);
       return r;
     });
@@ -152,8 +182,11 @@ export class PromptOptimizer {
   async variantsAsync(input: string): Promise<PromptVariant[]> {
     const variants = this.variants(input);
     const originalTokens = variants[0].estimatedTokens;
+    const inputIntent = detectIntentKind(input);
 
-    const aliasText = await this.semanticProvider.compressAsync(variants[2].text);
+    const aliasText = !this.shouldApplySemanticCompression(inputIntent)
+      ? variants[2].text
+      : await this.semanticProvider.compressAsync(variants[2].text);
     const aliasTokens = this.estimator.estimate(aliasText);
     variants[2] = {
       ...variants[2],
@@ -165,7 +198,9 @@ export class PromptOptimizer {
     const terseText = shortenLongPaths(
       collapseRepeatedParagraphs(aliasText)
     );
-    const terseWordNet = await this.semanticProvider.compressAsync(terseText);
+    const terseWordNet = !this.shouldApplySemanticCompression(inputIntent)
+      ? terseText
+      : await this.semanticProvider.compressAsync(terseText);
     const terseTokens = this.estimator.estimate(terseWordNet);
     variants[3] = {
       ...variants[3],

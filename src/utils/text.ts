@@ -6,6 +6,7 @@
  */
 export function normalizeWhitespace(text: string): string {
   return text
+    .replace(/[ \t]*\^[ \t]*(?:\r?\n|$)/g, "\n")
     .split("\n")
     .map((line) => line.replace(/[ \t]+/g, " ").trim())
     .join("\n")
@@ -128,6 +129,27 @@ export function compressUserStory(text: string): string {
 }
 
 /**
+ * Compresses common approval/request boilerplate used around sandbox actions.
+ */
+export function compressApprovalPrompt(text: string): string {
+  let result = text.trim();
+
+  result = result
+    .replace(/^do you want to\s+/i, "")
+    .replace(/^would you like to\s+/i, "")
+    .replace(/^are you sure you want to\s+/i, "")
+    .replace(/\brun a one-off\b/gi, "run one-off")
+    .replace(/\boutside the sandbox\b/gi, "outside sandbox")
+    .replace(/\bto verify it can return\b/gi, "to verify")
+    .replace(/\bfor the bridge\b/gi, "for bridge");
+
+  return result
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+/**
  * Canonicalizes common technical warning phrasing without changing core meaning.
  * Targets Git/runtime diagnostics and keeps path/env/protocol tokens intact.
  */
@@ -157,6 +179,38 @@ export function canonicalizeTechnicalMessage(text: string): string {
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
     .trim();
+}
+
+/**
+ * Compresses dotted alternatives that share the same prefix.
+ * Example: browser.storage.session or browser.storage.local -> browser.storage.session/local
+ */
+export function compressQualifiedAlternatives(text: string): string {
+  return text.replace(
+    /\b((?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*)\s+or\s+((?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*)\b/g,
+    (match, left: string, right: string) => {
+      const leftParts = left.split(".");
+      const rightParts = right.split(".");
+      if (leftParts.length !== rightParts.length) return match;
+
+      let sharedUntil = 0;
+      while (
+        sharedUntil < leftParts.length - 1 &&
+        leftParts[sharedUntil] === rightParts[sharedUntil]
+      ) {
+        sharedUntil += 1;
+      }
+
+      if (sharedUntil !== leftParts.length - 1) {
+        return match;
+      }
+
+      const sharedPrefix = leftParts.slice(0, -1).join(".");
+      const leftTail = leftParts[leftParts.length - 1];
+      const rightTail = rightParts[rightParts.length - 1];
+      return `${sharedPrefix}.${leftTail}/${rightTail}`;
+    }
+  );
 }
 
 /**
