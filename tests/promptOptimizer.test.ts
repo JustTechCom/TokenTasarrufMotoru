@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { rm } from "fs/promises";
 import { PromptOptimizer } from "../src/modules/promptOptimizer.js";
 import { defaultConfig } from "../src/config.js";
+import { EnglishSemanticProvider } from "../src/modules/englishSemanticProvider.js";
 
 const optimizer = new PromptOptimizer(defaultConfig.promptOptimizer);
+const TEST_SEMANTIC_DB = ".claude-token-optimizer/test-semantic-phrases.json";
 
 describe("PromptOptimizer", () => {
   it("normalizes excess whitespace", () => {
@@ -80,5 +83,142 @@ describe("PromptOptimizer", () => {
     const result = optimizer.optimize(input);
     expect(result).not.toContain("/home/user/projects/myapp");
     expect(result).toContain("LoginForm.tsx");
+  });
+
+  it("compresses English user story boilerplate", () => {
+    const input =
+      "As a user, I want to receive reminders for my appointments in advance so I don't miss any meetings.";
+    const variants = optimizer.variants(input);
+    const alias = variants.find((v) => v.label === "alias-compressed");
+
+    expect(alias).toBeDefined();
+    expect(alias!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(alias!.text).not.toMatch(/^As a user/i);
+    expect(alias!.text).not.toMatch(/\bI want to\b/i);
+    expect(alias!.text).not.toMatch(/\bso that\b/i);
+  });
+
+  it("compresses Turkish user story boilerplate", () => {
+    const input =
+      "Bir kullanıcı olarak, randevularım için önceden hatırlatma almak istiyorum; böylece hiçbir toplantıyı kaçırmayayım.";
+    const variants = optimizer.variants(input);
+    const alias = variants.find((v) => v.label === "alias-compressed");
+
+    expect(alias).toBeDefined();
+    expect(alias!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+    expect(alias!.text).not.toMatch(/^Bir kullanıcı olarak/i);
+    expect(alias!.text).not.toContain("böylece");
+  });
+  it("applies built-in English semantic shortening", () => {
+    const input = "Additional documentation regarding the application configuration is required.";
+    const result = optimizer.optimize(input);
+
+    expect(result).toContain("Additional docs");
+    expect(result).toContain("app config");
+    expect(result).toContain("required");
+  });
+
+  it("applies learned semantic phrases from the project phrase DB", async () => {
+    await rm(TEST_SEMANTIC_DB, { force: true });
+
+    const config = {
+      ...defaultConfig.promptOptimizer,
+      semanticCompression: {
+        ...defaultConfig.promptOptimizer.semanticCompression,
+        projectPhraseDbPath: TEST_SEMANTIC_DB,
+      },
+    };
+    const provider = new EnglishSemanticProvider(config.semanticCompression);
+    provider.learn({
+      from: "worktree ready",
+      to: "wt ready",
+      locale: "en",
+      approved: true,
+      source: "manual",
+    });
+
+    const semanticOptimizer = new PromptOptimizer(config);
+    const result = semanticOptimizer.optimize("Worktree ready. Additional documentation is required.");
+
+    expect(result).toContain("Wt ready");
+    expect(result).toContain("Additional docs");
+
+    await rm(TEST_SEMANTIC_DB, { force: true });
+  });
+
+  it("uses WordNet-backed English synonym compression for verbs and adjectives", async () => {
+    const variants = await optimizer.variantsAsync("Please receive additional assistance.");
+    const alias = variants.find((v) => v.label === "alias-compressed");
+
+    expect(alias).toBeDefined();
+    expect(alias!.text.toLowerCase()).not.toBe("receive additional assistance.");
+    expect(alias!.text.toLowerCase()).toMatch(/get|extra|needed|about/);
+    expect(alias!.text.toLowerCase()).toContain("assistance");
+  });
+
+  it("applies technical abbreviations in warning text without paraphrasing sensitive terms", async () => {
+    const variants = await optimizer.variantsAsync(
+      "Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification."
+    );
+    const alias = variants.find((v) => v.label === "alias-compressed");
+
+    expect(alias).toBeDefined();
+    expect(alias!.text).toContain("env var");
+    expect(alias!.text).toContain("TLS conns");
+    expect(alias!.text).toContain("HTTPS reqs");
+    expect(alias!.text).toContain("insecure");
+    expect(alias!.text).not.toContain("unsafe");
+  });
+
+  it("applies technical abbreviations in normalized output", () => {
+    const variants = optimizer.variants(
+      "Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification."
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.text).toContain("env var");
+    expect(normalized!.text).toContain("TLS conns");
+    expect(normalized!.text).toContain("HTTPS reqs");
+    expect(normalized!.text).toContain("insecure");
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+  });
+
+  it("canonicalizes git warning phrasing in normalized output", () => {
+    const variants = optimizer.variants(
+      "warning: in the working copy of 'extension/src/popup/popup.ts', LF will be replaced by CRLF the next time Git touches it"
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.text).toContain("in working copy");
+    expect(normalized!.text).toContain("LF -> CRLF");
+    expect(normalized!.text).toContain("next Git touch");
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+  });
+
+  it("canonicalizes common TypeScript diagnostics in normalized output", () => {
+    const variants = optimizer.variants(
+      "Type 'string' is not assignable to type 'number'. Property 'foo' does not exist on type 'Bar'."
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.text).toContain("type 'string'!= 'number'");
+    expect(normalized!.text).toContain("prop 'foo' missing on type 'Bar'");
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+  });
+
+  it("canonicalizes common runtime permission phrasing in normalized output", () => {
+    const variants = optimizer.variants(
+      "The operation was rejected by your operating system: operation not permitted, no such file or directory"
+    );
+    const normalized = variants.find((v) => v.label === "normalized");
+
+    expect(normalized).toBeDefined();
+    expect(normalized!.text).toContain("OS rejected op");
+    expect(normalized!.text).toContain("EPERM");
+    expect(normalized!.text).toContain("ENOENT");
+    expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
   });
 });

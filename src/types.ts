@@ -27,6 +27,7 @@ export interface PromptOptimizerOptions {
   preserveStackTraces: boolean;
   preserveUrls: boolean;
   dictionaryMap: Record<string, string>;
+  semanticCompression: SemanticCompressionOptions;
   aggressiveMode: boolean; // enables stopword pruning
 }
 
@@ -35,6 +36,31 @@ export interface PromptVariant {
   text: string;
   estimatedTokens: number;
   compressionRatio: number;
+}
+
+export interface SemanticCompressionOptions {
+  enabled: boolean;
+  locale: "auto" | "en" | "tr";
+  projectPhraseDbPath: string;
+  useEnglishSemanticProvider: boolean;
+  useWordPosWordNet: boolean;
+  externalEnglishSynonymsPath: string | null;
+  technicalAbbreviationMap: Record<string, string>;
+}
+
+export interface SemanticPhraseRecord {
+  from: string;
+  to: string;
+  locale: "en" | "tr" | "any";
+  approved: boolean;
+  createdAt: string;
+  source: "manual" | "builtin" | "imported";
+  usageCount: number;
+}
+
+export interface SemanticPhraseIndex {
+  version: number;
+  phrases: SemanticPhraseRecord[];
 }
 
 // ─── JSON Minifier ────────────────────────────────────────────────────────────

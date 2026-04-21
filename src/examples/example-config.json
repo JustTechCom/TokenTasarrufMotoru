@@ -21,6 +21,14 @@
       "implementation": "impl",
       "function": "fn"
     },
+    "semanticCompression": {
+      "enabled": true,
+      "locale": "auto",
+      "projectPhraseDbPath": ".claude-token-optimizer/semantic-phrases.json",
+      "useEnglishSemanticProvider": true,
+      "useWordPosWordNet": true,
+      "externalEnglishSynonymsPath": null
+    },
     "aggressiveMode": false
   },
   "jsonMinifier": {

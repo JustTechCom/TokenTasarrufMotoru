@@ -15,6 +15,8 @@ export { JsonMinifier } from "./modules/jsonMinifier.js";
 export { LogFilter } from "./modules/logFilter.js";
 export { DiffFilter } from "./modules/diffFilter.js";
 export { ContextRegistry } from "./modules/contextRegistry.js";
+export { SemanticPhraseStore } from "./modules/semanticPhraseStore.js";
+export { EnglishSemanticProvider } from "./modules/englishSemanticProvider.js";
 export { VariantSelector } from "./modules/variantSelector.js";
 export { SafetyScorer } from "./modules/safetyScorer.js";
 

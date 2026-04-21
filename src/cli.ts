@@ -7,6 +7,7 @@ import { JsonMinifier } from "./modules/jsonMinifier.js";
 import { LogFilter } from "./modules/logFilter.js";
 import { DiffFilter } from "./modules/diffFilter.js";
 import { ContextRegistry } from "./modules/contextRegistry.js";
+import { EnglishSemanticProvider } from "./modules/englishSemanticProvider.js";
 import { logger } from "./logger.js";
 import { LogMode } from "./types.js";
 import { createEstimator, EstimatorType } from "./utils/estimator.js";
@@ -259,6 +260,89 @@ cache
   });
 
 // ─── setup logging ────────────────────────────────────────────────────────────
+
+const semantic = program.command("semantic").description("Semantic phrase learning and inspection");
+
+semantic
+  .command("learn")
+  .description("Approve a semantic phrase replacement for future optimizations")
+  .requiredOption("--from <text>", "Verbose source phrase")
+  .requiredOption("--to <text>", "Shorter replacement phrase")
+  .option("--locale <locale>", "Phrase locale: en | tr | any", "en")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    const config = await resolveConfig({});
+    const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
+    const locale = opts.locale as "en" | "tr" | "any";
+    const learned = provider.learn({
+      from: opts.from,
+      to: opts.to,
+      locale,
+      approved: true,
+      source: "manual",
+    });
+
+    logger.out("\nLearned semantic phrase:");
+    logger.out(`${learned.locale}: ${learned.from} -> ${learned.to}`);
+  });
+
+semantic
+  .command("list")
+  .description("List approved semantic phrase replacements")
+  .option("--locale <locale>", "Phrase locale: en | tr | any", "en")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    const config = await resolveConfig({});
+    const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
+    const phrases = provider.list(opts.locale as "en" | "tr" | "any");
+
+    if (phrases.length === 0) {
+      logger.out("No approved semantic phrases.");
+      return;
+    }
+
+    for (const phrase of phrases) {
+      logger.out(
+        `${phrase.locale} | ${phrase.from} -> ${phrase.to} | uses=${phrase.usageCount} | source=${phrase.source}`
+      );
+    }
+  });
+
+semantic
+  .command("import")
+  .description("Import semantic phrase replacements from a JSON file into the project phrase DB")
+  .requiredOption("--file <path>", "JSON file containing [{ from, to, locale? }]")
+  .option("--locale <locale>", "Default locale when records omit it: en | tr | any", "en")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    const config = await resolveConfig({});
+    const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
+    const input = await readFile(opts.file, "utf8");
+    const parsed = JSON.parse(input) as Array<{ from?: string; to?: string; locale?: string }>;
+
+    if (!Array.isArray(parsed)) {
+      logger.error("Import file must be a JSON array.");
+      process.exit(1);
+    }
+
+    let imported = 0;
+    for (const item of parsed) {
+      if (!item || typeof item.from !== "string" || typeof item.to !== "string") {
+        continue;
+      }
+      const locale = (item.locale ?? opts.locale) as "en" | "tr" | "any";
+      provider.learn({
+        from: item.from,
+        to: item.to,
+        locale,
+        approved: true,
+        source: "imported",
+      });
+      imported += 1;
+    }
+
+    logger.out(`Imported ${imported} semantic phrases.`);
+  });
 
 function setupLogging(opts: { debug?: boolean; quiet?: boolean }) {
   if (opts.debug) logger.setLevel("debug");

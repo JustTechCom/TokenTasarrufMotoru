@@ -100,6 +100,66 @@ export function removeBoilerplate(text: string): string {
 }
 
 /**
+ * Compresses common agile user story boilerplate while preserving intent.
+ * Targets English and Turkish story phrasing with conservative rewrites.
+ */
+export function compressUserStory(text: string): string {
+  let result = text.trim();
+
+  result = result
+    .replace(/^as an? [^,.;:\n]+,\s*/i, "")
+    .replace(/^i want to\s+/i, "")
+    .replace(/\s+so that i (?:don't|do not)\s+/gi, " to avoid ")
+    .replace(/\s+so that i can\s+/gi, " to ")
+    .replace(/\s+so that\b/gi, " to ");
+
+  result = result
+    .replace(/^bir [^,.;:\n]+ olarak,\s*/iu, "")
+    .replace(/\bhatırlatma almak istiyorum\b/giu, "hatırlatma istiyorum")
+    .replace(/\bböylece\b/giu, "")
+    .replace(/\bhiçbir ([^ ]+)y[ıiuü] ([^ ]+mayay[ıiuü]m)\b/giu, "$1 $2");
+
+  return result
+    .replace(/\s*!=\s*/g, " != ")
+    .replace(/\s*->\s*/g, " -> ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+/**
+ * Canonicalizes common technical warning phrasing without changing core meaning.
+ * Targets Git/runtime diagnostics and keeps path/env/protocol tokens intact.
+ */
+export function canonicalizeTechnicalMessage(text: string): string {
+  let result = text;
+
+  result = result
+    .replace(/\bThe engine "?node"? is incompatible with this module\b/gi, "node engine mismatch")
+    .replace(/\bThe operation was rejected by your operating system\b/gi, "OS rejected op")
+    .replace(/\bno such file or directory\b/gi, "ENOENT")
+    .replace(/\boperation not permitted\b/gi, "EPERM")
+    .replace(/\bpermission denied\b/gi, "EACCES")
+    .replace(/\bcommand not found\b/gi, "cmd not found")
+    .replace(/\bCannot find module\b/gi, "missing module")
+    .replace(/Type '([^']+)' is not assignable to type '([^']+)'/gi, "type '$1' != '$2'")
+    .replace(/\bis not assignable to type\b/gi, "!= type")
+    .replace(/\bProperty '([^']+)' does not exist on type\b/gi, "prop '$1' missing on type")
+    .replace(/\bArgument of type\b/gi, "arg type")
+    .replace(/\bExpected (\d+) arguments?, but got (\d+)\b/gi, "args exp $1 got $2")
+    .replace(/\bin the working copy of\b/gi, "in working copy")
+    .replace(/\bwill be replaced by\b/gi, "->")
+    .replace(/\bthe next time\b/gi, "next")
+    .replace(/\bGit touches it\b/gi, "Git touch")
+    .replace(/\bby disabling\b/gi, "disabling");
+
+  return result
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+/**
  * Applies a dictionary map to replace long terms with shorter aliases.
  * Only replaces whole words (case-insensitive matching).
  * Preserves content inside URLs (https?://...) to avoid breaking links.
@@ -186,5 +246,30 @@ export function wordSimilarity(a: string, b: string): number {
   const tokB = new Set(b.toLowerCase().split(/\W+/).filter(Boolean));
   const intersection = [...tokA].filter((w) => tokB.has(w)).length;
   const union = new Set([...tokA, ...tokB]).size;
+  return union === 0 ? 1.0 : intersection / union;
+}
+
+/**
+ * Character n-gram Jaccard similarity.
+ * Helpful for abbreviations and morphologically similar forms.
+ */
+export function charNgramSimilarity(a: string, b: string, size = 3): number {
+  const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
+  const makeNgrams = (value: string): Set<string> => {
+    const normalized = normalize(value);
+    if (normalized.length <= size) {
+      return new Set(normalized ? [normalized] : []);
+    }
+    const grams = new Set<string>();
+    for (let i = 0; i <= normalized.length - size; i += 1) {
+      grams.add(normalized.slice(i, i + size));
+    }
+    return grams;
+  };
+
+  const gramsA = makeNgrams(a);
+  const gramsB = makeNgrams(b);
+  const intersection = [...gramsA].filter((gram) => gramsB.has(gram)).length;
+  const union = new Set([...gramsA, ...gramsB]).size;
   return union === 0 ? 1.0 : intersection / union;
 }

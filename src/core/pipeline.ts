@@ -37,7 +37,7 @@ export class OptimizationPipeline {
     logger.debug(`Pipeline: input length=${prompt.length} chars, dryRun=${dryRun}`);
 
     // Step 1: Generate variants
-    const variants = this.optimizer.variants(prompt);
+    const variants = await this.optimizer.variantsAsync(prompt);
     logger.debug(`Pipeline: generated ${variants.length} variants`);
 
     // Step 2: Select best safe variant (skips "original" label)

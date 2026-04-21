@@ -36,6 +36,38 @@ export const defaultConfig: OptimizationConfig = {
       "development": "dev",
       "production": "prod",
     },
+    semanticCompression: {
+      enabled: true,
+      locale: "auto",
+      projectPhraseDbPath: ".claude-token-optimizer/semantic-phrases.json",
+      useEnglishSemanticProvider: true,
+      useWordPosWordNet: true,
+      externalEnglishSynonymsPath: null,
+      technicalAbbreviationMap: {
+        "application": "app",
+        "applications": "apps",
+        "authentication": "auth",
+        "authorization": "authz",
+        "certificate": "cert",
+        "certificates": "certs",
+        "configuration": "config",
+        "configurations": "configs",
+        "connection": "conn",
+        "connections": "conns",
+        "documentation": "docs",
+        "environment": "env",
+        "environments": "envs",
+        "parameter": "param",
+        "parameters": "params",
+        "request": "req",
+        "requests": "reqs",
+        "response": "resp",
+        "responses": "resps",
+        "variable": "var",
+        "variables": "vars",
+        "verification": "verify",
+      },
+    },
     aggressiveMode: false,
   },
   jsonMinifier: {
@@ -87,10 +119,18 @@ export function mergeConfig(
 ): OptimizationConfig {
   const merged = { ...defaultConfig };
   for (const section of Object.keys(partial) as Array<keyof OptimizationConfig>) {
-    (merged as Record<string, unknown>)[section] = {
+    const nextSection = {
       ...(defaultConfig[section] as object),
       ...(partial[section] as object),
     };
+    if (section === "promptOptimizer") {
+      const promptSection = nextSection as OptimizationConfig["promptOptimizer"];
+      promptSection.semanticCompression = {
+        ...defaultConfig.promptOptimizer.semanticCompression,
+        ...(partial.promptOptimizer?.semanticCompression ?? {}),
+      };
+    }
+    (merged as Record<string, unknown>)[section] = nextSection;
   }
   return merged;
 }

@@ -6,19 +6,26 @@ import {
   collapseRepeatedParagraphs,
   shortenLongPaths,
   removeBoilerplate,
+  compressUserStory,
+  canonicalizeTechnicalMessage,
   applyDictionaryMap,
   processOutsideCodeBlocks,
   looksLikeStackTrace,
 } from "../utils/text.js";
 import { defaultEstimator } from "../utils/estimator.js";
+import { EnglishSemanticProvider } from "./englishSemanticProvider.js";
 
 // ─── Prompt Optimizer ─────────────────────────────────────────────────────────
 
 export class PromptOptimizer {
+  private semanticProvider: EnglishSemanticProvider;
+
   constructor(
     private opts: PromptOptimizerOptions,
     private estimator: TokenEstimator = defaultEstimator
-  ) {}
+  ) {
+    this.semanticProvider = new EnglishSemanticProvider(opts.semanticCompression);
+  }
 
   /**
    * Full optimization pass. Code blocks and stack traces are protected
@@ -42,8 +49,10 @@ export class PromptOptimizer {
       if (this.opts.normalizePunctuation) {
         chunk = normalizePunctuation(chunk);
       }
+      chunk = canonicalizeTechnicalMessage(chunk);
       if (this.opts.removeBoilerplate) {
         chunk = removeBoilerplate(chunk);
+        chunk = compressUserStory(chunk);
       }
       if (this.opts.deduplicateSentences) {
         chunk = deduplicateSentences(chunk);
@@ -54,6 +63,7 @@ export class PromptOptimizer {
       if (Object.keys(this.opts.dictionaryMap).length > 0) {
         chunk = applyDictionaryMap(chunk, this.opts.dictionaryMap);
       }
+      chunk = this.semanticProvider.compress(chunk);
       return chunk;
     };
 
@@ -71,6 +81,10 @@ export class PromptOptimizer {
     return text.trim();
   }
 
+  async optimizeAsync(input: string): Promise<string> {
+    return this.semanticProvider.compressAsync(this.optimize(input));
+  }
+
   /**
    * Produces named variants at different compression levels.
    * Variants: original → normalized → alias-compressed → terse-technical
@@ -86,11 +100,13 @@ export class PromptOptimizer {
       compressionRatio: 1.0,
     };
 
-    // Variant 2: normalized only (whitespace, punctuation)
+    // Variant 2: normalized only (whitespace, punctuation, technical shorthand)
     const normalizedText = processOutsideCodeBlocks(input, (t) => {
       let r = t;
       if (this.opts.normalizeWhitespace) r = normalizeWhitespace(r);
       if (this.opts.normalizePunctuation) r = normalizePunctuation(r);
+      r = canonicalizeTechnicalMessage(r);
+      r = this.semanticProvider.compress(r);
       return r;
     });
     const normalizedTokens = this.estimator.estimate(normalizedText);
@@ -104,7 +120,9 @@ export class PromptOptimizer {
     // Variant 3: alias-compressed (adds dictionary and boilerplate removal)
     const aliasText = processOutsideCodeBlocks(normalizedText, (t) => {
       let r = removeBoilerplate(t);
+      r = compressUserStory(r);
       r = applyDictionaryMap(r, this.opts.dictionaryMap);
+      r = this.semanticProvider.compress(r);
       if (this.opts.deduplicateSentences) r = deduplicateSentences(r);
       return r;
     });
@@ -129,5 +147,33 @@ export class PromptOptimizer {
     };
 
     return [original, normalized, aliasCompressed, terseTechnical];
+  }
+
+  async variantsAsync(input: string): Promise<PromptVariant[]> {
+    const variants = this.variants(input);
+    const originalTokens = variants[0].estimatedTokens;
+
+    const aliasText = await this.semanticProvider.compressAsync(variants[2].text);
+    const aliasTokens = this.estimator.estimate(aliasText);
+    variants[2] = {
+      ...variants[2],
+      text: aliasText,
+      estimatedTokens: aliasTokens,
+      compressionRatio: aliasTokens / Math.max(originalTokens, 1),
+    };
+
+    const terseText = shortenLongPaths(
+      collapseRepeatedParagraphs(aliasText)
+    );
+    const terseWordNet = await this.semanticProvider.compressAsync(terseText);
+    const terseTokens = this.estimator.estimate(terseWordNet);
+    variants[3] = {
+      ...variants[3],
+      text: terseWordNet,
+      estimatedTokens: terseTokens,
+      compressionRatio: terseTokens / Math.max(originalTokens, 1),
+    };
+
+    return variants;
   }
 }

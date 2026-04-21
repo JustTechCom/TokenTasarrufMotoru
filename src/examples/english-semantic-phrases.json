@@ -1,0 +1,7 @@
+[
+  { "from": "worktree ready", "to": "wt ready", "locale": "en" },
+  { "from": "baseline tests", "to": "baseline", "locale": "en" },
+  { "from": "pull request", "to": "pr", "locale": "en" },
+  { "from": "environment variables", "to": "env vars", "locale": "en" },
+  { "from": "user interface", "to": "ui", "locale": "en" }
+]

@@ -15,8 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "prebuild": "npm run clean",
+    "prepare": "npm run build",
     "hooks:install": "tsx scripts/install-hooks.ts",
     "hooks:install:project": "tsx scripts/install-hooks.ts --project",
     "hooks:uninstall": "tsx scripts/uninstall-hooks.ts",
@@ -25,7 +26,9 @@
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "wordnet-db": "^3.1.14",
+    "wordpos": "^2.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
