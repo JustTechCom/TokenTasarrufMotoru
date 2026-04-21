@@ -288,6 +288,32 @@ cache
     }
   });
 
+cache
+  .command("purge")
+  .description("Remove expired entries from the context registry")
+  .option("--older-than <hours>", "Purge entries older than N hours (overrides config TTL)")
+  .action(async (opts) => {
+    setupLogging(program.opts());
+    const config = await resolveConfig(program.opts());
+    const registry = new ContextRegistry(config.contextRegistry);
+
+    const olderThan = opts.olderThan !== undefined ? parseFloat(opts.olderThan) : undefined;
+    const effectiveTtl = olderThan ?? (config.contextRegistry.ttlHours ?? 24);
+
+    if (effectiveTtl === 0) {
+      logger.out("TTL is disabled. Use --older-than <hours> to purge manually.");
+      return;
+    }
+
+    const count = await registry.purge(olderThan);
+    const behavior = config.contextRegistry.purgeBehavior ?? "full";
+    if (behavior === "full") {
+      logger.out(`Purged ${count} entries (${count} files deleted).`);
+    } else {
+      logger.out(`Purged ${count} entries.`);
+    }
+  });
+
 // ─── setup logging ────────────────────────────────────────────────────────────
 
 const semantic = program.command("semantic").description("Semantic phrase learning and inspection");
