@@ -298,14 +298,20 @@ cache
     const registry = new ContextRegistry(config.contextRegistry);
 
     const olderThan = opts.olderThan !== undefined ? parseFloat(opts.olderThan) : undefined;
+
+    if (olderThan !== undefined && (isNaN(olderThan) || olderThan < 0)) {
+      logger.error(`Invalid --older-than value: "${opts.olderThan as string}". Must be a non-negative number.`);
+      process.exit(1);
+    }
+
     const effectiveTtl = olderThan ?? (config.contextRegistry.ttlHours ?? 24);
 
-    if (effectiveTtl === 0) {
-      logger.out("TTL is disabled. Use --older-than <hours> to purge manually.");
+    if (olderThan === undefined && effectiveTtl === 0) {
+      logger.out("TTL is disabled (config). Use --older-than <hours> to purge manually.");
       return;
     }
 
-    const count = await registry.purge(olderThan);
+    const count = await registry.purge(effectiveTtl);
     const behavior = config.contextRegistry.purgeBehavior ?? "full";
     if (behavior === "full") {
       logger.out(`Purged ${count} entries (${count} files deleted).`);
