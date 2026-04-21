@@ -474,7 +474,7 @@ Core modules:
 ## Roadmap
 
 - [x] ~~**NLP-based safety scorer** — hybrid TF-IDF cosine + Jaccard fallback for short texts~~
-- [ ] **Stream support** — line-by-line streaming for large log files
+- [x] ~~**Stream support** — line-by-line streaming for large log files via `filterStream()`~~
 - [ ] **Registry TTL** — automatic purge of stale cache entries
 - [ ] **Diff awareness** — track context across multiple change rounds
 - [ ] **Session growth tracking** — increase compression aggressiveness as conversation grows
