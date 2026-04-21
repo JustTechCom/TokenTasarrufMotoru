@@ -99,7 +99,7 @@ export const defaultConfig: OptimizationConfig = {
     cacheDir: ".claude-token-optimizer/cache",
     hashLength: 8,
     ttlHours: 24,
-    purgeBehavior: "full" as const,
+    purgeBehavior: "full",
   },
   policy: {
     shortOutputPolicy: false,
