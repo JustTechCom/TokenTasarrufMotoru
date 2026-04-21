@@ -28,13 +28,31 @@ program
 
 // ─── Helper: load config from CLI options ─────────────────────────────────────
 
-async function resolveConfig(opts: { config?: string; dryRun?: boolean }) {
-  let config = defaultConfig;
-  if (opts.config) {
-    config = await loadConfigFile(opts.config);
+async function resolveConfig(...sources: Array<{ config?: string; dryRun?: boolean }>) {
+  let configPath: string | undefined;
+  let dryRun = false;
+
+  for (const source of sources) {
+    if (source.config) {
+      configPath = source.config;
+    }
+    if (source.dryRun) {
+      dryRun = true;
+    }
   }
-  if (opts.dryRun) {
-    config = mergeConfig({ safety: { ...config.safety, dryRun: true } });
+
+  let config = defaultConfig;
+  if (configPath) {
+    config = await loadConfigFile(configPath);
+  }
+  if (dryRun) {
+    config = {
+      ...config,
+      safety: {
+        ...config.safety,
+        dryRun: true,
+      },
+    };
   }
   return config;
 }
@@ -50,7 +68,7 @@ program
   .action(async (opts, cmd) => {
     setupLogging(cmd.parent?.opts() ?? {});
     const globalOpts = cmd.parent?.opts() ?? {};
-    const config = await resolveConfig(opts);
+    const config = await resolveConfig(globalOpts, opts);
     const estimator = await createEstimator((globalOpts.estimator ?? "claude") as EstimatorType);
     const pipeline = new OptimizationPipeline(config, estimator);
     const result = await pipeline.run({ prompt: opts.input, dryRun: opts.dryRun });
@@ -89,7 +107,7 @@ program
   .action(async (file: string, opts) => {
     setupLogging(program.opts());
     const globalOpts = program.opts();
-    const config = await resolveConfig(opts);
+    const config = await resolveConfig(globalOpts, opts);
     const input = await readFile(file, "utf8");
     const estimator = await createEstimator((globalOpts.estimator ?? "claude") as EstimatorType);
     const pipeline = new OptimizationPipeline(config, estimator);
@@ -115,6 +133,7 @@ program
   .option("--tail <n>", "Keep last N matching lines (0 = all)", "0")
   .action(async (opts) => {
     setupLogging(program.opts());
+    const config = await resolveConfig(program.opts(), opts);
     let input: string;
     if (opts.file) {
       input = await readFile(opts.file, "utf8");
@@ -123,14 +142,14 @@ program
       process.exit(1);
     }
 
-    const config = mergeConfig({
+    const resolved = mergeConfig({
       logFilter: {
-        ...defaultConfig.logFilter,
+        ...config.logFilter,
         mode: opts.mode as LogMode,
         tailLines: parseInt(opts.tail, 10) || 0,
       },
     });
-    const filter = new LogFilter(config.logFilter);
+    const filter = new LogFilter(resolved.logFilter);
     const result = filter.filter(input);
 
     logger.out(`\nFiltered ${result.totalOutput} / ${result.totalInput} lines:\n`);
@@ -147,6 +166,7 @@ program
   .option("--remove-nulls", "Remove null values", false)
   .action(async (opts) => {
     setupLogging(program.opts());
+    const config = await resolveConfig(program.opts(), opts);
     let input: string;
     if (opts.file) {
       input = await readFile(opts.file, "utf8");
@@ -157,13 +177,13 @@ program
       process.exit(1);
     }
 
-    const config = mergeConfig({
+    const resolved = mergeConfig({
       jsonMinifier: {
-        ...defaultConfig.jsonMinifier,
+        ...config.jsonMinifier,
         removeNulls: !!opts.removeNulls,
       },
     });
-    const minifier = new JsonMinifier(config.jsonMinifier);
+    const minifier = new JsonMinifier(resolved.jsonMinifier);
     const result = minifier.minify(input);
 
     if (!result.valid) {
@@ -179,14 +199,18 @@ program
   .command("filter-diff")
   .description("Filter a git diff to relevant changes")
   .option("--file <path>", "Diff file to filter")
-  .option("--hide-whitespace", "Hide whitespace-only changes", true)
+  .option("--no-hide-whitespace", "Keep whitespace-only changes in the filtered diff")
   .action(async (opts) => {
     setupLogging(program.opts());
+    const config = await resolveConfig(program.opts(), opts);
     const input = opts.file
       ? await readFile(opts.file, "utf8")
       : (logger.error("Provide --file"), process.exit(1) as never);
 
-    const filter = new DiffFilter(defaultConfig.diffFilter);
+    const filter = new DiffFilter({
+      ...config.diffFilter,
+      hideWhitespaceOnly: opts.hideWhitespace,
+    });
     const result = filter.filter(input);
 
     logger.out(`\nIncluded files: ${result.filesIncluded.join(", ") || "none"}`);
@@ -207,6 +231,7 @@ cache
   .option("--tags <tags>", "Comma-separated tags")
   .action(async (opts) => {
     setupLogging(program.opts());
+    const config = await resolveConfig(program.opts(), opts);
     let content: string;
     if (opts.file) {
       content = await readFile(opts.file, "utf8");
@@ -218,7 +243,7 @@ cache
     }
 
     const tags = opts.tags ? (opts.tags as string).split(",").map((t: string) => t.trim()) : [];
-    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const registry = new ContextRegistry(config.contextRegistry);
     const ref = await registry.putOrRef(content, tags);
     logger.out(`\nStored as: ${ref}`);
   });
@@ -229,7 +254,8 @@ cache
   .argument("<ref>", "Registry reference (e.g. CTX_ab12cd34)")
   .action(async (ref: string) => {
     setupLogging(program.opts());
-    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const config = await resolveConfig(program.opts());
+    const registry = new ContextRegistry(config.contextRegistry);
     const content = await registry.get(ref);
     if (content === null) {
       logger.error(`Reference not found: ${ref}`);
@@ -243,7 +269,8 @@ cache
   .description("List all registry entries")
   .action(async () => {
     setupLogging(program.opts());
-    const registry = new ContextRegistry(defaultConfig.contextRegistry);
+    const config = await resolveConfig(program.opts());
+    const registry = new ContextRegistry(config.contextRegistry);
     const entries = await registry.list();
     if (entries.length === 0) {
       logger.out("Registry is empty.");
@@ -271,7 +298,7 @@ semantic
   .option("--locale <locale>", "Phrase locale: en | tr | any", "en")
   .action(async (opts) => {
     setupLogging(program.opts());
-    const config = await resolveConfig({});
+    const config = await resolveConfig(program.opts(), opts);
     const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
     const locale = opts.locale as "en" | "tr" | "any";
     const learned = provider.learn({
@@ -292,7 +319,7 @@ semantic
   .option("--locale <locale>", "Phrase locale: en | tr | any", "en")
   .action(async (opts) => {
     setupLogging(program.opts());
-    const config = await resolveConfig({});
+    const config = await resolveConfig(program.opts(), opts);
     const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
     const phrases = provider.list(opts.locale as "en" | "tr" | "any");
 
@@ -315,7 +342,7 @@ semantic
   .option("--locale <locale>", "Default locale when records omit it: en | tr | any", "en")
   .action(async (opts) => {
     setupLogging(program.opts());
-    const config = await resolveConfig({});
+    const config = await resolveConfig(program.opts(), opts);
     const provider = new EnglishSemanticProvider(config.promptOptimizer.semanticCompression);
     const input = await readFile(opts.file, "utf8");
     const parsed = JSON.parse(input) as Array<{ from?: string; to?: string; locale?: string }>;
