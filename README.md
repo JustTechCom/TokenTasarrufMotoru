@@ -475,7 +475,7 @@ Core modules:
 
 - [x] ~~**NLP-based safety scorer** — hybrid TF-IDF cosine + Jaccard fallback for short texts~~
 - [x] ~~**Stream support** — line-by-line streaming for large log files via `filterStream()`~~
-- [ ] **Registry TTL** — automatic purge of stale cache entries
+- [x] ~~**Registry TTL** — automatic purge of stale cache entries via `purge()` and `cache purge`~~
 - [ ] **Diff awareness** — track context across multiple change rounds
 - [ ] **Session growth tracking** — increase compression aggressiveness as conversation grows
 - [ ] **OpenTelemetry tracing** — spans for each pipeline step
