@@ -98,6 +98,8 @@ export const defaultConfig: OptimizationConfig = {
   contextRegistry: {
     cacheDir: ".claude-token-optimizer/cache",
     hashLength: 8,
+    ttlHours: 24,
+    purgeBehavior: "full" as const,
   },
   policy: {
     shortOutputPolicy: false,

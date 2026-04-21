@@ -111,6 +111,8 @@ export interface DiffFilterResult {
 export interface ContextRegistryOptions {
   cacheDir: string;
   hashLength: number; // 8 = CTX_ab12cd34
+  ttlHours?: number;  // 0 = disabled; default 24
+  purgeBehavior?: "index-only" | "full"; // default "full"
 }
 
 export interface RegistryEntry {
