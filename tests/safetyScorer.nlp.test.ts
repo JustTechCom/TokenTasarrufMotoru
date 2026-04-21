@@ -1,6 +1,7 @@
 // tests/safetyScorer.nlp.test.ts
 import { describe, it, expect } from "vitest";
 import { tfidfCosineSimilarity } from "../src/utils/text.js";
+import { SafetyScorer } from "../src/modules/safetyScorer.js";
 
 describe("tfidfCosineSimilarity", () => {
   it("returns 1.0 for identical texts", () => {
@@ -28,5 +29,46 @@ describe("tfidfCosineSimilarity", () => {
 
   it("returns 0.0 when both texts are empty", () => {
     expect(tfidfCosineSimilarity("", "")).toBe(0.0);
+  });
+});
+
+describe("SafetyScorer hybrid path", () => {
+  const opts = { threshold: 0.4, dryRun: false, logViolations: false };
+  const scorer = new SafetyScorer(opts);
+
+  it("passes technical abbreviation that Jaccard-only would reject", () => {
+    // 10 tokens — long path, TF-IDF used
+    const original = "analyze the database connection timeout error in the authentication service logs";
+    const compressed = "analyze db conn timeout error in auth service logs";
+    const result = scorer.score(original, compressed);
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails completely unrelated text", () => {
+    const original = "deploy kubernetes cluster with rolling updates and health probes";
+    const unrelated = "write a poem about autumn leaves falling in the forest";
+    const result = scorer.score(original, unrelated);
+    expect(result.passed).toBe(false);
+  });
+
+  it("uses Jaccard path for short texts (< 6 tokens)", () => {
+    // 3 tokens — short path
+    const original = "fix auth bug";
+    const optimized = "fix auth issue";
+    const result = scorer.score(original, optimized);
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails when optimized is empty regardless of path", () => {
+    const original = "analyze the database connection timeout error in the service";
+    const result = scorer.score(original, "");
+    expect(result.passed).toBe(false);
+  });
+
+  it("passes identical text", () => {
+    const text = "deploy service to production with rollback and health checks enabled";
+    const result = scorer.score(text, text);
+    expect(result.passed).toBe(true);
+    expect(result.score).toBeCloseTo(1.0, 1);
   });
 });

@@ -4,11 +4,14 @@ import { logger } from "../logger.js";
 
 // ─── Safety Scorer ────────────────────────────────────────────────────────────
 //
-// Measures semantic proximity between original and optimized text using a
-// heuristic word-level Jaccard similarity. No NLP required.
+// Measures semantic proximity between original and optimized text.
+// Long texts (≥ SHORT_TEXT_THRESHOLD tokens) use TF-IDF cosine similarity;
+// short texts fall back to Jaccard to avoid sparse-vector noise.
 //
 // Score of 1.0 = identical content, 0.0 = nothing in common.
 // If score < threshold, the caller should fall back to original.
+
+const SHORT_TEXT_THRESHOLD = 6;
 
 export class SafetyScorer {
   constructor(private opts: SafetyOptions) {}
@@ -18,7 +21,7 @@ export class SafetyScorer {
     const ngramSimilarity = charNgramSimilarity(original, optimized);
 
     const tokenCount = original.split(/\W+/).filter(Boolean).length;
-    const similarity = tokenCount < 6
+    const similarity = tokenCount < SHORT_TEXT_THRESHOLD
       ? Math.max(lexicalSimilarity, ngramSimilarity)
       : Math.max(tfidfCosineSimilarity(original, optimized), lexicalSimilarity);
 
