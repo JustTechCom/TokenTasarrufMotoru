@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { readFile } from "fs/promises";
+import { createReadStream } from "fs";
 import { defaultConfig, loadConfigFile, mergeConfig } from "./config.js";
 import { OptimizationPipeline } from "./core/pipeline.js";
 import { JsonMinifier } from "./modules/jsonMinifier.js";
@@ -134,10 +135,8 @@ program
   .action(async (opts) => {
     setupLogging(program.opts());
     const config = await resolveConfig(program.opts(), opts);
-    let input: string;
-    if (opts.file) {
-      input = await readFile(opts.file, "utf8");
-    } else {
+
+    if (!opts.file) {
       logger.error("Provide --file <path>");
       process.exit(1);
     }
@@ -150,10 +149,13 @@ program
       },
     });
     const filter = new LogFilter(resolved.logFilter);
-    const result = filter.filter(input);
-
-    logger.out(`\nFiltered ${result.totalOutput} / ${result.totalInput} lines:\n`);
-    logger.out(result.lines.join("\n"));
+    const stream = createReadStream(opts.file);
+    let count = 0;
+    for await (const line of filter.filterStream(stream)) {
+      process.stdout.write(line + "\n");
+      count++;
+    }
+    logger.info(`Filtered ${count} matching lines.`);
   });
 
 // ─── minify-json ──────────────────────────────────────────────────────────────
