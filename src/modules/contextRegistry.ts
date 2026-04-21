@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import { ContextRegistryOptions, RegistryEntry, RegistryIndex } from "../types.js";
@@ -62,6 +62,7 @@ export class ContextRegistry {
     await this.saveIndex(index);
 
     logger.info(`Registry: stored ${ref} (${content.length} chars)`);
+    this.purge().catch(() => {});
     return ref;
   }
 
@@ -121,5 +122,33 @@ export class ContextRegistry {
       return existing;
     }
     return this.put(content, tags);
+  }
+
+  async purge(olderThanHours?: number): Promise<number> {
+    const ttl = olderThanHours ?? this.opts.ttlHours ?? 24;
+    if (ttl === 0 && olderThanHours === undefined) return 0;
+
+    const index = await this.loadIndex();
+    const now = Date.now();
+    const cutoffMs = ttl * 3600 * 1000;
+    const behavior = this.opts.purgeBehavior ?? "full";
+    let removed = 0;
+
+    for (const [hash, entry] of Object.entries(index.entries)) {
+      const age = now - new Date(entry.createdAt).getTime();
+      if (age > cutoffMs) {
+        if (behavior === "full") {
+          await unlink(join(this.entryDir, `${hash}.txt`)).catch(() => {});
+        }
+        delete index.entries[hash];
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      await this.saveIndex(index);
+    }
+
+    return removed;
   }
 }
