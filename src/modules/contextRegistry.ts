@@ -62,7 +62,9 @@ export class ContextRegistry {
     await this.saveIndex(index);
 
     logger.info(`Registry: stored ${ref} (${content.length} chars)`);
-    this.purge().catch(() => {});
+    this.purge().catch((err: unknown) => {
+      logger.warn(`Registry: background purge failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
     return ref;
   }
 
@@ -125,8 +127,9 @@ export class ContextRegistry {
   }
 
   async purge(olderThanHours?: number): Promise<number> {
+    if (olderThanHours === undefined && (this.opts.ttlHours ?? 24) === 0) return 0;
+
     const ttl = olderThanHours ?? this.opts.ttlHours ?? 24;
-    if (ttl === 0 && olderThanHours === undefined) return 0;
 
     const index = await this.loadIndex();
     const now = Date.now();
@@ -138,7 +141,11 @@ export class ContextRegistry {
       const age = now - new Date(entry.createdAt).getTime();
       if (age > cutoffMs) {
         if (behavior === "full") {
-          await unlink(join(this.entryDir, `${hash}.txt`)).catch(() => {});
+          await unlink(join(this.entryDir, `${hash}.txt`)).catch((err: NodeJS.ErrnoException) => {
+            if (err.code !== "ENOENT") {
+              logger.warn(`Registry: failed to unlink ${hash}.txt: ${err.message}`);
+            }
+          });
         }
         delete index.entries[hash];
         removed++;
