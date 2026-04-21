@@ -343,8 +343,11 @@ export function tfidfCosineSimilarity(a: string, b: string): number {
   if (tokensA.length === 0 || tokensB.length === 0) return 0.0;
 
   const tf = (tokens: string[]): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const t of tokens) counts.set(t, (counts.get(t) ?? 0) + 1);
+    const total = tokens.length;
     const result = new Map<string, number>();
-    for (const t of tokens) result.set(t, 1);
+    for (const [term, count] of counts) result.set(term, count / total);
     return result;
   };
 
@@ -353,11 +356,12 @@ export function tfidfCosineSimilarity(a: string, b: string): number {
 
   const vocab = new Set([...tfA.keys(), ...tfB.keys()]);
 
-  // Smoothed IDF: log(1 + N/df) with N=2 to avoid zero-weighting shared terms
+  const CORPUS_SIZE = 2; // two-document corpus: {a, b}
+  // Smoothed IDF: log(1 + N/df) — shared terms get log(2)≈0.693, unique terms get log(3)≈1.099
   const idf = new Map<string, number>();
   for (const term of vocab) {
     const df = (tfA.has(term) ? 1 : 0) + (tfB.has(term) ? 1 : 0);
-    idf.set(term, Math.log(1 + 2 / df));
+    idf.set(term, Math.log(1 + CORPUS_SIZE / df));
   }
 
   const vecA = new Map<string, number>();
@@ -379,5 +383,6 @@ export function tfidfCosineSimilarity(a: string, b: string): number {
   }
 
   const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  // Math.min guards against floating-point values marginally above 1.0
   return denom === 0 ? 0.0 : Math.min(1.0, dot / denom);
 }
