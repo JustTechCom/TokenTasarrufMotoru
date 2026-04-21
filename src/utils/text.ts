@@ -327,3 +327,57 @@ export function charNgramSimilarity(a: string, b: string, size = 3): number {
   const union = new Set([...gramsA, ...gramsB]).size;
   return union === 0 ? 1.0 : intersection / union;
 }
+
+/**
+ * TF-IDF cosine similarity between two texts.
+ * Uses smoothed IDF: log(1 + 2/df) over a two-document corpus {a, b}.
+ * Returns 0.0–1.0. Synchronous, no I/O, no external dependencies.
+ */
+export function tfidfCosineSimilarity(a: string, b: string): number {
+  const tokenize = (text: string): string[] =>
+    text.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter(Boolean);
+
+  const tokensA = tokenize(a);
+  const tokensB = tokenize(b);
+
+  if (tokensA.length === 0 || tokensB.length === 0) return 0.0;
+
+  const tf = (tokens: string[]): Map<string, number> => {
+    const result = new Map<string, number>();
+    for (const t of tokens) result.set(t, 1);
+    return result;
+  };
+
+  const tfA = tf(tokensA);
+  const tfB = tf(tokensB);
+
+  const vocab = new Set([...tfA.keys(), ...tfB.keys()]);
+
+  // Smoothed IDF: log(1 + N/df) with N=2 to avoid zero-weighting shared terms
+  const idf = new Map<string, number>();
+  for (const term of vocab) {
+    const df = (tfA.has(term) ? 1 : 0) + (tfB.has(term) ? 1 : 0);
+    idf.set(term, Math.log(1 + 2 / df));
+  }
+
+  const vecA = new Map<string, number>();
+  const vecB = new Map<string, number>();
+  for (const term of vocab) {
+    vecA.set(term, (tfA.get(term) ?? 0) * (idf.get(term) ?? 0));
+    vecB.set(term, (tfB.get(term) ?? 0) * (idf.get(term) ?? 0));
+  }
+
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (const term of vocab) {
+    const va = vecA.get(term) ?? 0;
+    const vb = vecB.get(term) ?? 0;
+    dot += va * vb;
+    normA += va * va;
+    normB += vb * vb;
+  }
+
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0.0 : Math.min(1.0, dot / denom);
+}
