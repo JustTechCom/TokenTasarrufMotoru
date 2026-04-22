@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { rm } from "fs/promises";
 import { PromptOptimizer } from "../src/modules/promptOptimizer.js";
 import { defaultConfig } from "../src/config.js";
 import { EnglishSemanticProvider } from "../src/modules/englishSemanticProvider.js";
+import { OllamaOptimizer } from "../src/modules/ollamaOptimizer.js";
 
 const optimizer = new PromptOptimizer(defaultConfig.promptOptimizer);
 const TEST_SEMANTIC_DB = ".claude-token-optimizer/test-semantic-phrases.json";
@@ -303,5 +304,62 @@ This repository currently does not contain the actual extension source code; onl
     expect(normalized!.text).toContain("EPERM");
     expect(normalized!.text).toContain("ENOENT");
     expect(normalized!.estimatedTokens).toBeLessThan(variants[0].estimatedTokens);
+  });
+});
+
+describe("PromptOptimizer + OllamaOptimizer integration", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("ollama variant joins competition — selector can pick it when it is shortest", async () => {
+    const shortText = "Do X.";
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ response: shortText }),
+    });
+
+    const ollamaOpts = {
+      enabled: true,
+      baseUrl: "http://localhost:11434",
+      model: "gemma4",
+      timeoutMs: 5000,
+    };
+    const ollamaOptimizer = new OllamaOptimizer(ollamaOpts);
+    const optimizer = new PromptOptimizer(defaultConfig.promptOptimizer, undefined, ollamaOptimizer);
+
+    const input = "Please could you analyze this long error message for me and explain what went wrong.";
+    const variants = await optimizer.variantsAsync(input);
+
+    const labels = variants.map((v) => v.label);
+    expect(labels).toContain("ollama-gemma4");
+
+    const ollamaVariant = variants.find((v) => v.label === "ollama-gemma4")!;
+    expect(ollamaVariant.text).toBe(shortText);
+  });
+
+  it("ollama offline — variantsAsync produces rule-based variants normally", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("ECONNREFUSED"));
+
+    const ollamaOpts = {
+      enabled: true,
+      baseUrl: "http://localhost:11434",
+      model: "gemma4",
+      timeoutMs: 5000,
+    };
+    const ollamaOptimizer = new OllamaOptimizer(ollamaOpts);
+    const optimizer = new PromptOptimizer(defaultConfig.promptOptimizer, undefined, ollamaOptimizer);
+
+    const input = "Please could you analyze this error for me.";
+    const variants = await optimizer.variantsAsync(input);
+
+    expect(variants.length).toBeGreaterThanOrEqual(4);
+    const labels = variants.map((v) => v.label);
+    expect(labels).not.toContain("ollama-gemma4");
+    expect(labels).toContain("original");
   });
 });
