@@ -9,6 +9,7 @@ export class OllamaOptimizer {
 
   async generateVariant(prompt: string): Promise<PromptVariant | null> {
     if (!this.opts.enabled) return null;
+    if (this.opts.timeoutMs <= 0) return null;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.opts.timeoutMs);
@@ -25,8 +26,16 @@ export class OllamaOptimizer {
         signal: controller.signal,
       });
 
-      const data = (await res.json()) as { response?: string };
-      const text = data.response ?? "";
+      if (!res.ok) return null;
+
+      const raw: unknown = await res.json();
+      const text =
+        raw !== null &&
+        typeof raw === "object" &&
+        "response" in raw &&
+        typeof (raw as { response?: unknown }).response === "string"
+          ? (raw as { response: string }).response
+          : "";
 
       if (!text || text.length >= prompt.length) return null;
 
@@ -34,7 +43,7 @@ export class OllamaOptimizer {
       const estimatedTokens = defaultEstimator.estimate(text);
 
       return {
-        label: "ollama-gemma4",
+        label: `ollama-${this.opts.model}`,
         text,
         estimatedTokens,
         compressionRatio: estimatedTokens / Math.max(originalTokens, 1),
