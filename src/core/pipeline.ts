@@ -57,19 +57,44 @@ export class OptimizationPipeline {
     const optimized = fallbackDecision.useOriginal
       ? prompt
       : chosenWithPolicy;
+    const optimizedTokens = fallbackDecision.useOriginal
+      ? selectionResult.original.estimatedTokens
+      : this.estimator.estimate(optimized);
+    const estimatedSavings = Math.max(
+      0,
+      selectionResult.original.estimatedTokens - optimizedTokens
+    );
+    const finalChosen = fallbackDecision.useOriginal
+      ? selectionResult.original
+      : {
+          ...selectionResult.chosen,
+          text: optimized,
+          estimatedTokens: optimizedTokens,
+          compressionRatio:
+            optimizedTokens / Math.max(selectionResult.original.estimatedTokens, 1),
+        };
+    const finalSelectionResult = {
+      ...selectionResult,
+      chosen: finalChosen,
+      estimatedSavings,
+      safetyScore: finalSafety.score,
+    };
 
     logger.info(
-      `Pipeline: savings=${selectionResult.estimatedSavings} tokens, ` +
-      `safetyScore=${selectionResult.safetyScore.toFixed(3)}, ` +
+      `Pipeline: savings=${estimatedSavings} tokens, ` +
+      `potential=${selectionResult.potentialSavings} tokens, ` +
+      `safetyScore=${finalSafety.score.toFixed(3)}, ` +
       `fallback=${fallbackDecision.useOriginal}`
     );
 
     return {
       original: prompt,
       optimized,
-      selectionResult,
+      selectionResult: finalSelectionResult,
       policyInjection,
       safetyResult: finalSafety,
+      estimatedSavings,
+      potentialSavings: selectionResult.potentialSavings,
       fallbackUsed: fallbackDecision.useOriginal,
       dryRun,
     };

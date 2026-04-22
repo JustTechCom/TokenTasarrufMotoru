@@ -12,6 +12,7 @@ import { EnglishSemanticProvider } from "./modules/englishSemanticProvider.js";
 import { logger } from "./logger.js";
 import { LogMode } from "./types.js";
 import { createEstimator, EstimatorType } from "./utils/estimator.js";
+import { formatCandidateOutputs } from "./utils/cliOutput.js";
 
 // ─── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -85,12 +86,20 @@ program
           `  [${c.label}] ${c.estimatedTokens} tokens (${(c.compressionRatio * 100).toFixed(1)}%)`
         );
       }
+
+      logger.out("\nCandidate outputs:");
+      for (const output of formatCandidateOutputs(result.selectionResult)) {
+        logger.out(`\n${output}`);
+      }
     }
 
     logger.out(`\nChosen: [${result.selectionResult?.chosen.label ?? "original"}]`);
     logger.out(result.optimized);
 
-    logger.out(`\nEstimated savings: ${result.selectionResult?.estimatedSavings ?? 0} tokens`);
+    logger.out(`\nEstimated savings: ${result.estimatedSavings} tokens`);
+    if (result.potentialSavings > result.estimatedSavings) {
+      logger.out(`Potential savings across variants: ${result.potentialSavings} tokens`);
+    }
     logger.out(`Safety score: ${(result.selectionResult?.safetyScore ?? 1).toFixed(3)}`);
     if (result.fallbackUsed) {
       logger.out(`⚠ Fallback used: original prompt preserved`);
@@ -117,7 +126,10 @@ program
     logger.out("\n=== OPTIMIZE FILE RESULT ===");
     logger.out(`Original: ${result.selectionResult?.original.estimatedTokens ?? "?"} tokens`);
     logger.out(`Optimized: ${result.selectionResult?.chosen.estimatedTokens ?? "?"} tokens`);
-    logger.out(`Savings: ${result.selectionResult?.estimatedSavings ?? 0} tokens`);
+    logger.out(`Savings: ${result.estimatedSavings} tokens`);
+    if (result.potentialSavings > result.estimatedSavings) {
+      logger.out(`Potential savings: ${result.potentialSavings} tokens`);
+    }
     logger.out(`Safety: ${(result.selectionResult?.safetyScore ?? 1).toFixed(3)}`);
     logger.out(`Fallback: ${result.fallbackUsed}`);
     logger.out("\n--- Optimized Output ---");

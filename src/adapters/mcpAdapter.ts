@@ -36,14 +36,19 @@ export class McpAdapter {
   async optimizePrompt(prompt: string, dryRun = false): Promise<{
     optimized: string;
     estimatedSavings: number;
+    potentialSavings: number;
     safetyScore: number;
     fallbackUsed: boolean;
   }> {
     const result = await this.pipeline.run({ prompt, dryRun });
-    logger.info(`MCP optimizePrompt: savings=${result.selectionResult?.estimatedSavings ?? 0}`);
+    logger.info(
+      `MCP optimizePrompt: savings=${result.estimatedSavings}, ` +
+      `potential=${result.potentialSavings}`
+    );
     return {
       optimized: result.optimized,
-      estimatedSavings: result.selectionResult?.estimatedSavings ?? 0,
+      estimatedSavings: result.estimatedSavings,
+      potentialSavings: result.potentialSavings,
       safetyScore: result.selectionResult?.safetyScore ?? 1,
       fallbackUsed: result.fallbackUsed,
     };

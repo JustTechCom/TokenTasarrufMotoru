@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { VariantSelector } from "../src/modules/variantSelector.js";
-import { PromptVariant } from "../src/types.js";
+import { PromptVariant, TokenEstimator } from "../src/types.js";
 
 const original = "deploy service to production with rollback and health checks enabled";
 
@@ -19,26 +19,37 @@ const candidates: PromptVariant[] = [
   },
 ];
 
+const wordEstimator: TokenEstimator = {
+  estimate(text: string): number {
+    return text.split(/\W+/).filter(Boolean).length;
+  },
+};
+
 describe("VariantSelector", () => {
-  it("selects more aggressive variant with lower threshold", () => {
+  it("selects the most compressed candidate even with a lower threshold", () => {
     const selector = new VariantSelector({
       threshold: 0.5,
       dryRun: false,
       logViolations: false,
-    });
+    }, wordEstimator);
 
     const result = selector.select(original, candidates);
     expect(result.chosen.label).toBe("aggressive");
+    expect(result.estimatedSavings).toBe(5);
+    expect(result.potentialSavings).toBe(5);
   });
 
-  it("selects less compressed variant with higher threshold", () => {
+  it("still selects the most compressed candidate with a higher threshold", () => {
     const selector = new VariantSelector({
       threshold: 0.8,
       dryRun: false,
       logViolations: false,
-    });
+    }, wordEstimator);
 
     const result = selector.select(original, candidates);
-    expect(result.chosen.label).toBe("balanced");
+    expect(result.chosen.label).toBe("aggressive");
+    expect(result.estimatedSavings).toBe(5);
+    expect(result.potentialSavings).toBe(5);
+    expect(result.safetyScore).toBeLessThan(0.8);
   });
 });

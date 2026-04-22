@@ -132,8 +132,9 @@ export interface RegistryIndex {
 export interface SelectionResult {
   original: PromptVariant;
   candidates: PromptVariant[];
-  chosen: PromptVariant;
-  estimatedSavings: number; // tokens saved vs original
+  chosen: PromptVariant; // final emitted variant after fallback/policy handling
+  estimatedSavings: number; // tokens saved vs original for the final emitted variant
+  potentialSavings: number; // best-case tokens saved vs original across generated variants
   safetyScore: number;
 }
 
@@ -188,6 +189,8 @@ export interface PipelineOutput {
   selectionResult?: SelectionResult;
   policyInjection?: PolicyInjection;
   safetyResult?: SafetyResult;
+  estimatedSavings: number; // tokens saved by the final emitted output
+  potentialSavings: number; // best-case tokens saved across generated variants
   fallbackUsed: boolean;
   dryRun: boolean;
 }

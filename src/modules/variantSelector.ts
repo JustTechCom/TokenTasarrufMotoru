@@ -18,8 +18,9 @@ export class VariantSelector {
   }
 
   /**
-   * Selects the most compressed variant that still passes the safety threshold.
-   * Falls back to original if none pass.
+   * Selects the final cumulative variant produced by the optimizer.
+   * Safety is still measured here, but fallback to the original is handled later
+   * in the pipeline after policy injection.
    */
   select(original: string, candidates: PromptVariant[]): SelectionResult {
     const originalTokens = this.estimator.estimate(original);
@@ -30,39 +31,31 @@ export class VariantSelector {
       compressionRatio: 1.0,
     };
 
-    // Sort candidates by compression ratio ascending (most compressed first)
-    const sorted = [...candidates].sort(
-      (a, b) => a.compressionRatio - b.compressionRatio
+    const chosen = candidates.reduce<PromptVariant>(
+      (best, candidate) =>
+        candidate.compressionRatio < best.compressionRatio ? candidate : best,
+      originalVariant
+    );
+    const safetyResult = this.scorer.score(original, chosen.text);
+
+    logger.debug(
+      `Variant selected: ${chosen.label} ` +
+      `(score=${safetyResult.score.toFixed(3)}, tokens=${chosen.estimatedTokens})`
     );
 
-    let chosen: PromptVariant = originalVariant;
-    let safetyResult = { score: 1.0, passed: true };
-
-    for (const candidate of sorted) {
-      if (candidate.label === "original") continue;
-
-      const result = this.scorer.score(original, candidate.text);
-      if (result.passed) {
-        chosen = candidate;
-        safetyResult = result;
-        logger.debug(
-          `Variant selected: ${candidate.label} ` +
-          `(score=${result.score.toFixed(3)}, tokens=${candidate.estimatedTokens})`
-        );
-        break;
-      }
-      logger.debug(
-        `Variant rejected: ${candidate.label} (score=${result.score.toFixed(3)})`
-      );
-    }
-
-    const estimatedSavings = originalTokens - chosen.estimatedTokens;
+    const estimatedSavings = Math.max(0, originalTokens - chosen.estimatedTokens);
+    const bestCandidateTokens = candidates.reduce(
+      (lowest, candidate) => Math.min(lowest, candidate.estimatedTokens),
+      originalTokens
+    );
+    const potentialSavings = Math.max(0, originalTokens - bestCandidateTokens);
 
     return {
       original: originalVariant,
       candidates,
       chosen,
       estimatedSavings,
+      potentialSavings,
       safetyScore: safetyResult.score,
     };
   }

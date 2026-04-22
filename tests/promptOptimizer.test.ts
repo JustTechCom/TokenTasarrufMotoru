@@ -62,7 +62,7 @@ describe("PromptOptimizer", () => {
       "original",
       "normalized",
       "alias-compressed",
-      "terse-technical",
+      "normalized+alias-compressed+terse-technical",
     ]);
   });
 

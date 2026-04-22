@@ -104,7 +104,7 @@ export class PromptOptimizer {
 
   /**
    * Produces named variants at different compression levels.
-   * Variants: original → normalized → alias-compressed → terse-technical
+   * Variants: original → normalized → alias-compressed → normalized+alias-compressed+terse-technical
    */
   variants(input: string): PromptVariant[] {
     const originalTokens = this.estimator.estimate(input);
@@ -170,7 +170,7 @@ export class PromptOptimizer {
     );
     const terseTokens = this.estimator.estimate(terseText);
     const terseTechnical: PromptVariant = {
-      label: "terse-technical",
+      label: "normalized+alias-compressed+terse-technical",
       text: terseText,
       estimatedTokens: terseTokens,
       compressionRatio: terseTokens / Math.max(originalTokens, 1),

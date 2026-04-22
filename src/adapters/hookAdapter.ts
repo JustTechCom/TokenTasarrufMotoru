@@ -47,7 +47,7 @@ export class HookAdapter {
     return {
       content: result.optimized,
       modified: result.optimized !== ctx.content,
-      tokensaved: result.selectionResult?.estimatedSavings,
+      tokensaved: result.estimatedSavings,
     };
   }
 
