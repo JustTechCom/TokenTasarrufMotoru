@@ -29,18 +29,21 @@ export class OllamaOptimizer {
       if (!res.ok) return null;
 
       const raw: unknown = await res.json();
-      const text =
+      const text = (
         raw !== null &&
         typeof raw === "object" &&
         "response" in raw &&
         typeof (raw as { response?: unknown }).response === "string"
           ? (raw as { response: string }).response
-          : "";
+          : ""
+      ).trim();
 
-      if (!text || text.length >= prompt.length) return null;
+      if (!text) return null;
 
       const originalTokens = defaultEstimator.estimate(prompt);
       const estimatedTokens = defaultEstimator.estimate(text);
+
+      if (estimatedTokens >= originalTokens) return null;
 
       return {
         label: `ollama-${this.opts.model}`,

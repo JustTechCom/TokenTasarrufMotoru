@@ -383,6 +383,8 @@ Uses a local LLM (Gemma 4 via [Ollama](https://ollama.com)) as an additional var
 ollama pull gemma4
 ```
 
+> **Note:** Verify the exact model tag with `ollama list` after pulling. If `gemma4` is unavailable, check the [Ollama library](https://ollama.com/library/gemma) for the correct tag and update `model` in your config accordingly.
+
 **Enable in config:**
 
 ```json
