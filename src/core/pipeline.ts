@@ -1,5 +1,6 @@
 import { OptimizationConfig, PipelineInput, PipelineOutput, TokenEstimator } from "../types.js";
 import { PromptOptimizer } from "../modules/promptOptimizer.js";
+import { OllamaOptimizer } from "../modules/ollamaOptimizer.js";
 import { VariantSelector } from "../modules/variantSelector.js";
 import { PolicyEngine } from "./policies.js";
 import { SafetyScorer } from "../modules/safetyScorer.js";
@@ -26,10 +27,28 @@ export class OptimizationPipeline {
     private config: OptimizationConfig,
     private estimator: TokenEstimator = defaultEstimator
   ) {
-    this.optimizer = new PromptOptimizer(config.promptOptimizer, estimator);
-    this.selector = new VariantSelector(config.safety, estimator);
+    const ollamaOpt = config.ollamaOptimizer.enabled
+      ? new OllamaOptimizer(config.ollamaOptimizer)
+      : undefined;
+    this.optimizer = new PromptOptimizer(config.promptOptimizer, estimator, ollamaOpt);
+
+    // Build an inverse map (abbrev → full word) from both dictionary sources so
+    // that the safety scorer can expand "db" → "database" before computing
+    // similarity — preventing false-positive fallbacks on valid compressions.
+    const abbreviationExpansions: Record<string, string> = {};
+    for (const [full, abbrev] of Object.entries(config.promptOptimizer.dictionaryMap)) {
+      abbreviationExpansions[abbrev] = full;
+    }
+    for (const [full, abbrev] of Object.entries(
+      config.promptOptimizer.semanticCompression.technicalAbbreviationMap
+    )) {
+      abbreviationExpansions[abbrev] = full;
+    }
+
+    const safetyWithExpansions = { ...config.safety, abbreviationExpansions };
+    this.selector = new VariantSelector(safetyWithExpansions, estimator);
     this.policy = new PolicyEngine(config.policy);
-    this.scorer = new SafetyScorer(config.safety);
+    this.scorer = new SafetyScorer(safetyWithExpansions);
   }
 
   async run(input: PipelineInput): Promise<PipelineOutput> {
