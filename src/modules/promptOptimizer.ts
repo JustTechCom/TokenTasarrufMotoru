@@ -17,6 +17,7 @@ import {
 import { defaultEstimator } from "../utils/estimator.js";
 import { EnglishSemanticProvider } from "./englishSemanticProvider.js";
 import { canonicalizeIntentAwareText, detectIntentKind } from "./intentCanonicalizer.js";
+import { OllamaOptimizer } from "./ollamaOptimizer.js";
 
 // ─── Prompt Optimizer ─────────────────────────────────────────────────────────
 
@@ -25,7 +26,8 @@ export class PromptOptimizer {
 
   constructor(
     private opts: PromptOptimizerOptions,
-    private estimator: TokenEstimator = defaultEstimator
+    private estimator: TokenEstimator = defaultEstimator,
+    private ollamaOptimizer?: OllamaOptimizer
   ) {
     this.semanticProvider = new EnglishSemanticProvider(opts.semanticCompression);
   }
@@ -180,9 +182,23 @@ export class PromptOptimizer {
   }
 
   async variantsAsync(input: string): Promise<PromptVariant[]> {
-    const variants = this.variants(input);
-    const originalTokens = variants[0].estimatedTokens;
+    const originalTokens = this.estimator.estimate(input);
     const inputIntent = detectIntentKind(input);
+
+    const [ruleVariants, ollamaVariant] = await Promise.all([
+      this._computeRuleVariants(input, originalTokens, inputIntent),
+      this.ollamaOptimizer?.generateVariant(input) ?? Promise.resolve(null),
+    ]);
+
+    return ollamaVariant ? [...ruleVariants, ollamaVariant] : ruleVariants;
+  }
+
+  private async _computeRuleVariants(
+    input: string,
+    originalTokens: number,
+    inputIntent: string
+  ): Promise<PromptVariant[]> {
+    const variants = this.variants(input);
 
     const aliasText = !this.shouldApplySemanticCompression(inputIntent)
       ? variants[2].text
@@ -195,9 +211,7 @@ export class PromptOptimizer {
       compressionRatio: aliasTokens / Math.max(originalTokens, 1),
     };
 
-    const terseText = shortenLongPaths(
-      collapseRepeatedParagraphs(aliasText)
-    );
+    const terseText = shortenLongPaths(collapseRepeatedParagraphs(aliasText));
     const terseWordNet = !this.shouldApplySemanticCompression(inputIntent)
       ? terseText
       : await this.semanticProvider.compressAsync(terseText);
