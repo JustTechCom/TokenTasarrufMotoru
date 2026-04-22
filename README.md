@@ -373,6 +373,37 @@ Important fields:
 | `false` | `false` | `true` | Failed / crash / exit-code lines only |
 | `false` | `false` | `false` | Empty result `[]` |
 
+### Ollama LLM Optimizer (opt-in)
+
+Uses a local LLM (Gemma 4 via [Ollama](https://ollama.com)) as an additional variant producer. The LLM rewrites the prompt to be shorter; if it wins the token-saving competition, that variant is used. Falls back silently if Ollama is offline or returns a longer result.
+
+**Setup:**
+
+```bash
+ollama pull gemma4
+```
+
+**Enable in config:**
+
+```json
+{
+  "ollamaOptimizer": {
+    "enabled": true,
+    "baseUrl": "http://localhost:11434",
+    "model": "gemma4",
+    "timeoutMs": 10000
+  }
+}
+```
+
+**Run:**
+
+```bash
+claude-token-optimizer --config ./optimizer.config.json optimize --input "Your long prompt here"
+```
+
+If Ollama is not running or the rewritten prompt is not shorter than the original, the optimizer falls back to rule-based variants automatically.
+
 ## Claude Code Hooks
 
 Install globally:
