@@ -54,6 +54,8 @@ const PRESERVE_TECHNICAL_TERMS = new Set([
   "http",
   "insecure",
   "security",
+  "service",
+  "services",
   "tls",
   "unsafe",
   "verification",

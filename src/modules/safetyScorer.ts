@@ -16,14 +16,38 @@ const SHORT_TEXT_THRESHOLD = 6;
 export class SafetyScorer {
   constructor(private opts: SafetyOptions) {}
 
+  private expandAbbreviations(text: string): string {
+    const expansions = this.opts.abbreviationExpansions;
+    if (!expansions || Object.keys(expansions).length === 0) return text;
+    let result = text;
+    for (const [abbrev, full] of Object.entries(expansions)) {
+      const pattern = new RegExp(`\\b${abbrev}\\b`, "gi");
+      result = result.replace(pattern, full);
+    }
+    return result;
+  }
+
   score(original: string, optimized: string): SafetyResult {
-    const lexicalSimilarity = wordSimilarity(original, optimized);
-    const ngramSimilarity = charNgramSimilarity(original, optimized);
+    const expandedOptimized = this.expandAbbreviations(optimized);
+    const lexicalSimilarity = Math.max(
+      wordSimilarity(original, optimized),
+      wordSimilarity(original, expandedOptimized),
+    );
+    const ngramSimilarity = Math.max(
+      charNgramSimilarity(original, optimized),
+      charNgramSimilarity(original, expandedOptimized),
+    );
 
     const tokenCount = original.split(/\W+/).filter(Boolean).length;
+    const tfidf = tokenCount < SHORT_TEXT_THRESHOLD
+      ? 0
+      : Math.max(
+          tfidfCosineSimilarity(original, optimized),
+          tfidfCosineSimilarity(original, expandedOptimized),
+        );
     const similarity = tokenCount < SHORT_TEXT_THRESHOLD
       ? Math.max(lexicalSimilarity, ngramSimilarity)
-      : Math.max(tfidfCosineSimilarity(original, optimized), lexicalSimilarity);
+      : Math.max(tfidf, lexicalSimilarity);
 
     // Length ratio guard: if optimized is less than 40% the original length
     // in chars, it's likely too aggressive regardless of word overlap.

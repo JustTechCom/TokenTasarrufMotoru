@@ -13,7 +13,9 @@ export class VariantSelector {
     safetyOpts: SafetyOptions,
     estimator: TokenEstimator = defaultEstimator
   ) {
-    this.scorer = new SafetyScorer(safetyOpts);
+    // Suppress violation logging here — the pipeline re-scores after policy
+    // injection and owns the single authoritative warning.
+    this.scorer = new SafetyScorer({ ...safetyOpts, logViolations: false });
     this.estimator = estimator;
   }
 

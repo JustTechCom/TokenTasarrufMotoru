@@ -159,6 +159,10 @@ export interface SafetyOptions {
   threshold: number;   // similarity threshold below which we fallback
   dryRun: boolean;
   logViolations: boolean;
+  // Inverse of dictionaryMap/technicalAbbreviationMap — used to expand
+  // abbreviations in the optimized text before similarity computation so that
+  // "db" matches "database", "auth" matches "authentication", etc.
+  abbreviationExpansions?: Record<string, string>;
 }
 
 export interface SafetyResult {

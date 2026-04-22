@@ -32,6 +32,38 @@ describe("tfidfCosineSimilarity", () => {
   });
 });
 
+describe("SafetyScorer abbreviation expansion", () => {
+  const expansions = {
+    db: "database",
+    conn: "connection",
+    auth: "authentication",
+    config: "configuration",
+    env: "environment",
+    repo: "repository",
+  };
+  const opts = { threshold: 0.4, dryRun: false, logViolations: false, abbreviationExpansions: expansions };
+  const scorer = new SafetyScorer(opts);
+
+  it("passes boilerplate-removed + abbreviated variant that would otherwise fall below threshold", () => {
+    // Exact scenario from the CLI regression report
+    const original =
+      "Please could you kindly analyze the database connection timeout error in the authentication service logs";
+    // After boilerplate removal ("Please could you kindly") + alias compression (db, conn, auth)
+    const compressed = "study the db conn timeout error in the auth service logs";
+    const result = scorer.score(original, compressed);
+    expect(result.passed).toBe(true);
+    expect(result.score).toBeGreaterThan(0.4);
+  });
+
+  it("does not inflate score for truly unrelated text even with expansions", () => {
+    const original =
+      "Please could you kindly analyze the database connection timeout error in the authentication service logs";
+    const unrelated = "write a poem about autumn leaves";
+    const result = scorer.score(original, unrelated);
+    expect(result.passed).toBe(false);
+  });
+});
+
 describe("SafetyScorer hybrid path", () => {
   const opts = { threshold: 0.4, dryRun: false, logViolations: false };
   const scorer = new SafetyScorer(opts);

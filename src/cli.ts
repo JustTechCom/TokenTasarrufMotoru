@@ -75,7 +75,9 @@ program
     const pipeline = new OptimizationPipeline(config, estimator);
     const result = await pipeline.run({ prompt: opts.input, dryRun: opts.dryRun });
 
+    const estimatorLabel = (globalOpts.estimator ?? "claude") as string;
     logger.out("\n=== TOKEN OPTIMIZER RESULT ===");
+    logger.out(`Estimator: ${estimatorLabel}`);
     logger.out(`\nOriginal (${result.selectionResult?.original.estimatedTokens ?? "?"} tokens):`);
     logger.out(result.original);
 
